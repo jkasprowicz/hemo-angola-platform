@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+const demoPassword = process.env.E2E_DEMO_PASSWORD;
+
+if (!demoPassword) {
+  throw new Error("E2E_DEMO_PASSWORD must be defined for end-to-end tests.");
+}
 
 test("critical local-first flow", async ({ browser }) => {
   const context = await browser.newContext();
@@ -7,7 +12,7 @@ test("critical local-first flow", async ({ browser }) => {
 
   await page.goto("/login");
   await page.getByLabel("Usuário").fill("operador");
-  await page.getByLabel("Senha").fill("Demo12345!");
+  await page.getByLabel("Senha").fill(demoPassword);
   await page.getByRole("button", { name: "Entrar" }).click();
 
   await expect(page).toHaveURL(/\/inicio$/);
@@ -92,7 +97,7 @@ test("critical local-first flow", async ({ browser }) => {
   await expect(reopenedPage).toHaveURL(/\/login$/);
 
   await reopenedPage.getByLabel("Usuário").fill("operador");
-  await reopenedPage.getByLabel("Senha").fill("Demo12345!");
+  await reopenedPage.getByLabel("Senha").fill(demoPassword);
   await reopenedPage.getByRole("button", { name: "Entrar" }).click();
   await expect(reopenedPage).toHaveURL(/\/inicio$/);
   await expect(reopenedPage.getByRole("button", { name: "Sair" })).toBeVisible();
@@ -102,7 +107,7 @@ test("critical local-first flow", async ({ browser }) => {
 test("logout redirects immediately and blocks protected routes", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Usuário").fill("operador");
-  await page.getByLabel("Senha").fill("Demo12345!");
+  await page.getByLabel("Senha").fill(demoPassword);
   await page.getByRole("button", { name: "Entrar" }).click();
 
   await expect(page).toHaveURL(/\/inicio$/);

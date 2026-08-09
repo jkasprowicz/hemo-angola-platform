@@ -1,4 +1,7 @@
+import os
+import secrets
 import uuid
+from contextlib import contextmanager
 from typing import Dict, Optional
 
 from django.contrib.auth import get_user_model
@@ -14,12 +17,30 @@ from apps.submissions.models import ReportingPeriod, Submission, SubmissionVersi
 User = get_user_model()
 
 
+@contextmanager
+def demo_password(password: str = ""):
+    if not password:
+        password = secrets.token_urlsafe(18)
+    previous_password = os.environ.get("DJANGO_DEMO_PASSWORD")
+    os.environ["DJANGO_DEMO_PASSWORD"] = password
+    try:
+        yield
+    finally:
+        if previous_password is None:
+            os.environ.pop("DJANGO_DEMO_PASSWORD", None)
+        else:
+            os.environ["DJANGO_DEMO_PASSWORD"] = previous_password
+
+
 @override_settings(
     ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"],
     CSRF_TRUSTED_ORIGINS=["http://localhost:5173", "http://127.0.0.1:5173"],
 )
 class DashboardViewTests(TestCase):
     def setUp(self):
+        self.demo_password_context = demo_password()
+        self.demo_password_context.__enter__()
+        self.addCleanup(self.demo_password_context.__exit__, None, None, None)
         ensure_demo_data()
         self.client = APIClient(enforce_csrf_checks=True)
         self.user = User.objects.get(username="operador")

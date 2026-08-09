@@ -1,5 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
+const demoPassword = process.env.E2E_DEMO_PASSWORD;
+
+if (!demoPassword) {
+  throw new Error("E2E_DEMO_PASSWORD must be defined for end-to-end tests.");
+}
+
 
 test.setTimeout(90_000);
 
@@ -72,7 +78,7 @@ test("dashboard MVP uses synced backend data and supports period drill-down", as
 async function login(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Usuário").fill("operador");
-  await page.getByLabel("Senha").fill("Demo12345!");
+  await page.getByLabel("Senha").fill(demoPassword);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/\/inicio$/);
 }

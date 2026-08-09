@@ -1,4 +1,6 @@
 import os
+import secrets
+from contextlib import contextmanager
 
 from django.core.management import call_command
 from django.contrib.auth import get_user_model
@@ -22,9 +24,34 @@ from hemo_angola.settings import build_cors_allowed_origins, build_csrf_trusted_
 User = get_user_model()
 
 
+@contextmanager
+def demo_password(password: str = ""):
+    if not password:
+        password = secrets.token_urlsafe(18)
+    previous_password = os.environ.get("DJANGO_DEMO_PASSWORD")
+    os.environ["DJANGO_DEMO_PASSWORD"] = password
+    try:
+        yield
+    finally:
+        if previous_password is None:
+            os.environ.pop("DJANGO_DEMO_PASSWORD", None)
+        else:
+            os.environ["DJANGO_DEMO_PASSWORD"] = previous_password
+
+
+def current_demo_password() -> str:
+    password = os.environ.get("DJANGO_DEMO_PASSWORD", "").strip()
+    if not password:
+        raise AssertionError("DJANGO_DEMO_PASSWORD must be set for this test.")
+    return password
+
+
 @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
 class HealthEndpointTests(TestCase):
     def setUp(self):
+        self.demo_password_context = demo_password()
+        self.demo_password_context.__enter__()
+        self.addCleanup(self.demo_password_context.__exit__, None, None, None)
         ensure_demo_data()
 
     def test_health_endpoint_returns_expected_payload(self):
@@ -33,15 +60,14 @@ class HealthEndpointTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["status"], "ok")
         self.assertEqual(response.data["database"], "ok")
-        self.assertEqual(
-            response.data["pipeline"],
-            ["submission", "validation", "accepted_data", "consolidation", "dashboard"],
-        )
 
 
 @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
 class AuthAndSyncFlowTests(TestCase):
     def setUp(self):
+        self.demo_password_context = demo_password()
+        self.demo_password_context.__enter__()
+        self.addCleanup(self.demo_password_context.__exit__, None, None, None)
         ensure_demo_data()
         self.client = APIClient(enforce_csrf_checks=True)
 
@@ -55,7 +81,7 @@ class AuthAndSyncFlowTests(TestCase):
         csrf_cookie = self._get_csrf_cookie()
         response = self.client.post(
             "/api/auth/login/",
-            {"username": "operador", "password": "Demo12345!"},
+            {"username": "operador", "password": current_demo_password()},
             format="json",
             HTTP_X_CSRFTOKEN=csrf_cookie,
         )
@@ -85,7 +111,7 @@ class AuthAndSyncFlowTests(TestCase):
         csrf_cookie = self._get_csrf_cookie()
         response = self.client.post(
             "/api/auth/login/",
-            {"username": "operador", "password": "Demo12345!"},
+            {"username": "operador", "password": current_demo_password()},
             format="json",
             HTTP_X_CSRFTOKEN=csrf_cookie,
             HTTP_ORIGIN="http://localhost:5173",
@@ -236,8 +262,9 @@ class AuthAndSyncFlowTests(TestCase):
 @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
 class SeedDemoDataTests(TestCase):
     def test_seed_demo_data_is_idempotent_and_creates_expected_users(self):
-        call_command("seed_demo_data")
-        call_command("seed_demo_data")
+        with demo_password():
+            call_command("seed_demo_data")
+            call_command("seed_demo_data")
 
         self.assertEqual(User.objects.filter(username="operador").count(), 1)
         self.assertEqual(User.objects.filter(username="revisor").count(), 1)
@@ -247,17 +274,28 @@ class SeedDemoDataTests(TestCase):
         self.assertEqual(CollectionVariable.objects.filter(code="delayed_serology_releases_count").count(), 0)
 
     def test_seed_demo_data_reset_rebuilds_demo_baseline(self):
-        call_command("seed_demo_data")
+        with demo_password():
+            call_command("seed_demo_data")
         IndicatorDefinition.objects.filter(is_demo=True).delete()
         CollectionVariable.objects.filter(is_demo=True).delete()
         CollectionModule.objects.filter(is_demo=True).delete()
 
-        call_command("seed_demo_data", reset=True)
+        with demo_password():
+            call_command("seed_demo_data", reset=True)
 
         self.assertEqual(CollectionModule.objects.filter(is_demo=True).count(), 3)
         self.assertEqual(CollectionVariable.objects.filter(is_demo=True).count(), 6)
         self.assertEqual(IndicatorDefinition.objects.filter(is_demo=True).count(), 3)
         self.assertEqual(UserProfile.objects.filter(user__username="operador", role="operator").count(), 1)
+
+    def test_seed_demo_data_requires_explicit_password(self):
+        previous_password = os.environ.pop("DJANGO_DEMO_PASSWORD", None)
+        try:
+            with self.assertRaisesMessage(Exception, "Provide --demo-password or DJANGO_DEMO_PASSWORD"):
+                call_command("seed_demo_data")
+        finally:
+            if previous_password is not None:
+                os.environ["DJANGO_DEMO_PASSWORD"] = previous_password
 
 
 class CsrfTrustedOriginsSettingsTests(TestCase):

@@ -30,21 +30,7 @@ class HealthView(APIView):
             cursor.execute("SELECT 1")
             cursor.fetchone()
 
-        return Response(
-            {
-                "status": "ok",
-                "database": "ok",
-                "authentication": "session",
-                "csrf": "enabled",
-                "pipeline": [
-                    "submission",
-                    "validation",
-                    "accepted_data",
-                    "consolidation",
-                    "dashboard",
-                ],
-            }
-        )
+        return Response({"status": "ok", "database": "ok"})
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")

@@ -1,0 +1,17 @@
+[Unit]
+Description=HEMO-ANGOLA Gunicorn service
+After=network.target
+
+[Service]
+User=hemo
+Group=www-data
+WorkingDirectory=/srv/hemo-angola/backend
+EnvironmentFile=/etc/hemo-angola/backend.env
+ExecStart=/srv/hemo-angola/backend/.venv/bin/gunicorn --config /srv/hemo-angola/backend/gunicorn.conf.py hemo_angola.wsgi:application
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGQUIT
+
+[Install]
+WantedBy=multi-user.target

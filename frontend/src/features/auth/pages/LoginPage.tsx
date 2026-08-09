@@ -6,10 +6,13 @@ import { useState } from "react";
 
 import { authService } from "../../../services/authService";
 
+const demoUsername = import.meta.env.VITE_DEMO_USERNAME ?? "operador";
+const demoCredentialsHint = import.meta.env.VITE_DEMO_CREDENTIALS_HINT ?? "";
+
 
 export function LoginPage() {
   const form = useForm({
-    initialValues: { username: "operador", password: "Demo12345!" },
+    initialValues: { username: demoUsername, password: "" },
     validate: {
       username: (value) => (value.trim().length < 3 ? "Informe o usuário." : null),
       password: (value) => (value.trim().length < 3 ? "Informe a senha." : null),
@@ -68,7 +71,7 @@ export function LoginPage() {
             })}
           >
             <Stack gap="sm">
-              <TextInput label="Usuário" placeholder="operador" {...form.getInputProps("username")} />
+              <TextInput label="Usuário" placeholder={demoUsername} {...form.getInputProps("username")} />
               <PasswordInput label="Senha" placeholder="Sua senha" {...form.getInputProps("password")} />
               <Button type="submit" loading={loginMutation.isPending}>
                 Entrar
@@ -76,9 +79,7 @@ export function LoginPage() {
             </Stack>
           </form>
 
-          <Alert color="gray" variant="light">
-            Conta demonstrativa padrão: <strong>operador / Demo12345!</strong>
-          </Alert>
+          {demoCredentialsHint ? <Alert color="gray" variant="light">{demoCredentialsHint}</Alert> : null}
         </Stack>
       </Paper>
     </Container>

@@ -17,6 +17,8 @@ staticfiles/
 # Node
 node_modules/
 dist/
+dev-dist/
+*.tsbuildinfo
 
 # Playwright
 playwright-report/

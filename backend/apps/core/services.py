@@ -1,4 +1,5 @@
 import datetime
+import os
 from calendar import monthrange
 from typing import Iterable, Optional, Tuple
 
@@ -37,6 +38,24 @@ DEMO_MONTH_LABELS = (
     "Novembro",
     "Dezembro",
 )
+
+
+def get_demo_password() -> str:
+    password = os.getenv("DJANGO_DEMO_PASSWORD", "").strip()
+    if not password:
+        raise ValueError(
+            "DJANGO_DEMO_PASSWORD must be provided to create or reset demo credentials."
+        )
+    return password
+
+
+def build_demo_users(unit: Optional[Unit], password: str) -> Iterable[Tuple[str, str, str, Optional[Unit]]]:
+    return [
+        ("operador", password, UserProfile.ROLE_OPERATOR, unit),
+        ("revisor", password, UserProfile.ROLE_REVIEWER, unit),
+        ("gestor", password, UserProfile.ROLE_MANAGER, None),
+        ("admin", password, UserProfile.ROLE_ADMIN, unit),
+    ]
 
 
 def _delete_demo_catalog() -> None:
@@ -315,12 +334,7 @@ def ensure_demo_data() -> None:
         is_demo=True,
     )
 
-    demo_users: Iterable[Tuple[str, str, str, Optional[Unit]]] = [
-        ("operador", "Demo12345!", UserProfile.ROLE_OPERATOR, unit),
-        ("revisor", "Demo12345!", UserProfile.ROLE_REVIEWER, unit),
-        ("gestor", "Demo12345!", UserProfile.ROLE_MANAGER, None),
-        ("admin", "Demo12345!", UserProfile.ROLE_ADMIN, unit),
-    ]
+    demo_users = build_demo_users(unit, get_demo_password())
 
     for username, password, role, user_unit in demo_users:
         user, created = User.objects.get_or_create(
