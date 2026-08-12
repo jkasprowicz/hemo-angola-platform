@@ -70,12 +70,16 @@ export function RecordDetailPage() {
             <InfoItem label="ID da coleta" value={record.id} />
             <InfoItem label="Unidade" value={bootstrap.data.unit?.name ?? "Não definida"} />
             <InfoItem label="Período" value={record.reportingPeriodLabel} />
+            <InfoItem label="Data da coleta" value={formatDate(record.collectionDate)} />
             <InfoItem label="Status da coleta" value={getCollectionStatusLabel(record.collectionStatus)} />
             <InfoItem label="Status de envio" value={getSyncStatusLabel(record.syncStatus)} />
             <InfoItem label="Completude" value={`${getRecordCompletion(record).overallCompletionPercentage}%`} />
             <InfoItem label="Versão" value={record.versionNumber > 0 ? String(record.versionNumber) : "Rascunho"} />
             <InfoItem label="Criado em" value={new Date(record.createdAt).toLocaleString("pt-BR")} />
-            <InfoItem label="Atualizado em" value={new Date(record.lastSavedAt).toLocaleString("pt-BR")} />
+            <InfoItem label="Atualizado em" value={new Date(record.updatedAt).toLocaleString("pt-BR")} />
+            <InfoItem label="Fechado em" value={formatDateTime(record.closedAt)} />
+            <InfoItem label="Enviado em" value={formatDateTime(record.submittedAt)} />
+            <InfoItem label="Recebido em" value={formatDateTime(record.receivedAt)} />
           </SimpleGrid>
           <Group>
             {(record.collectionStatus === "in_progress" || record.collectionStatus === "ready_for_review") ? (
@@ -178,4 +182,18 @@ function formatResponseValue(value: string | number | boolean | null | undefined
     return value;
   }
   return "Não informado";
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Data não informada";
+  }
+  return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "Ainda não registrado";
+  }
+  return new Date(value).toLocaleString("pt-BR");
 }

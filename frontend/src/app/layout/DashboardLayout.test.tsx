@@ -1,5 +1,6 @@
 import React from "react";
 import { MantineProvider } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +17,14 @@ vi.mock("../../services/authService", () => ({
     logout: logoutMock,
   },
 }));
+
+vi.mock("@mantine/hooks", async () => {
+  const actual = await vi.importActual<typeof import("@mantine/hooks")>("@mantine/hooks");
+  return {
+    ...actual,
+    useMediaQuery: vi.fn(),
+  };
+});
 
 
 function renderDashboardLayout(initialEntry = "/dashboard") {
@@ -67,5 +76,14 @@ describe("DashboardLayout", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
     expect(await screen.findByText("Login")).toBeTruthy();
     expect(logoutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses stacked responsive header controls on mobile", () => {
+    vi.mocked(useMediaQuery).mockReturnValue(true);
+    renderDashboardLayout();
+
+    expect(screen.getByRole("button", { name: "Sistema" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sair" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Voltar ao sistema" })).toBeNull();
   });
 });

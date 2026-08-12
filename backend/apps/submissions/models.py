@@ -177,11 +177,15 @@ class Submission(models.Model):
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="submissions")
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, related_name="submissions")
     reporting_period = models.ForeignKey(ReportingPeriod, on_delete=models.CASCADE, related_name="submissions")
+    collection_date = models.DateField(null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="submissions")
     current_status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_DRAFT)
     client_submission_uuid = models.UUIDField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ("-updated_at",)
@@ -217,6 +221,7 @@ class SubmissionVersion(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="submission_versions")
     created_at = models.DateTimeField(auto_now_add=True)
     synced_at = models.DateTimeField(null=True, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
     conflict_reason = models.TextField(blank=True)
 
     class Meta:

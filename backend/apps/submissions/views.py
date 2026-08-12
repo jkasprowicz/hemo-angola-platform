@@ -49,10 +49,26 @@ class SyncBatchView(APIView):
                     "institution": institution,
                     "unit": unit,
                     "reporting_period": period,
+                    "collection_date": item["collection_date"],
                     "created_by": request.user,
                     "current_status": Submission.STATUS_SUBMITTED,
+                    "closed_at": item["closed_at"],
+                    "submitted_at": item.get("submitted_at") or timezone.now(),
                 },
             )
+            submission_updates = []
+            if submission.collection_date != item["collection_date"]:
+                submission.collection_date = item["collection_date"]
+                submission_updates.append("collection_date")
+            if submission.closed_at != item["closed_at"]:
+                submission.closed_at = item["closed_at"]
+                submission_updates.append("closed_at")
+            submitted_at = item.get("submitted_at") or submission.submitted_at or timezone.now()
+            if submission.submitted_at != submitted_at:
+                submission.submitted_at = submitted_at
+                submission_updates.append("submitted_at")
+            if submission_updates:
+                submission.save(update_fields=[*submission_updates, "updated_at"])
             if created:
                 audit_service.log(
                     action="SUBMISSION_CREATED",
@@ -79,7 +95,7 @@ class SyncBatchView(APIView):
                         "submissionUuid": str(submission.client_submission_uuid),
                         "versionNumber": version.version_number,
                         "status": SubmissionVersion.STATUS_RECEIVED,
-                        "syncedAt": version.synced_at.isoformat() if version.synced_at else None,
+                        "syncedAt": version.received_at.isoformat() if version.received_at else version.synced_at.isoformat() if version.synced_at else None,
                         "idempotent": True,
                     }
                 )
@@ -94,9 +110,11 @@ class SyncBatchView(APIView):
                 status=SubmissionVersion.STATUS_RECEIVED,
                 created_by=request.user,
                 synced_at=timezone.now(),
+                received_at=timezone.now(),
             )
             submission.current_status = Submission.STATUS_SYNCED
-            submission.save(update_fields=["current_status", "updated_at"])
+            submission.received_at = version.received_at
+            submission.save(update_fields=["current_status", "received_at", "updated_at"])
 
             audit_service.log(
                 action="SUBMISSION_SYNC_SUCCEEDED",
@@ -148,7 +166,7 @@ class SyncBatchView(APIView):
                     "submissionUuid": str(submission.client_submission_uuid),
                     "versionNumber": version.version_number,
                     "status": SubmissionVersion.STATUS_RECEIVED,
-                    "syncedAt": version.synced_at.isoformat() if version.synced_at else None,
+                    "syncedAt": version.received_at.isoformat() if version.received_at else version.synced_at.isoformat() if version.synced_at else None,
                     "idempotent": False,
                 }
             )

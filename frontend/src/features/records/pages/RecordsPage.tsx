@@ -39,7 +39,7 @@ export function RecordsPage() {
   }, [localDataRevision, selectedReportingPeriodId]);
 
   const sortedRecords = useMemo(
-    () => [...records].sort((left, right) => right.lastSavedAt.localeCompare(left.lastSavedAt)),
+    () => [...records].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     [records],
   );
 
@@ -101,10 +101,11 @@ export function RecordsPage() {
         </Alert>
       ) : null}
       <Card withBorder radius="md">
-        <Table striped highlightOnHover>
+        <Table striped highlightOnHover visibleFrom="md">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Período</Table.Th>
+              <Table.Th>Data</Table.Th>
               <Table.Th>Unidade</Table.Th>
               <Table.Th>Status da coleta</Table.Th>
               <Table.Th>Completude</Table.Th>
@@ -118,6 +119,7 @@ export function RecordsPage() {
             {sortedRecords.map((record) => (
               <Table.Tr key={record.id}>
                 <Table.Td>{record.reportingPeriodLabel}</Table.Td>
+                <Table.Td>{formatDate(record.collectionDate)}</Table.Td>
                 <Table.Td>{bootstrap.data?.unit?.name ?? "Unidade demonstrativa"}</Table.Td>
                 <Table.Td>
                   <CollectionStatusBadge status={record.collectionStatus} />
@@ -127,7 +129,7 @@ export function RecordsPage() {
                   <SyncStatusBadge status={record.syncStatus} />
                 </Table.Td>
                 <Table.Td>{record.versionNumber > 0 ? record.versionNumber : "Rascunho"}</Table.Td>
-                <Table.Td>{new Date(record.lastSavedAt).toLocaleString("pt-BR")}</Table.Td>
+                <Table.Td>{new Date(record.updatedAt).toLocaleString("pt-BR")}</Table.Td>
                 <Table.Td>
                   <Group gap="xs">
                     {record.collectionStatus === "in_progress" || record.collectionStatus === "ready_for_review" ? (
@@ -221,6 +223,41 @@ export function RecordsPage() {
             ))}
           </Table.Tbody>
         </Table>
+        <Stack gap="sm" hiddenFrom="md">
+          {sortedRecords.map((record) => (
+            <Card key={record.id} withBorder radius="md" p="sm">
+              <Stack gap="xs">
+                <Text fw={600}>{record.reportingPeriodLabel}</Text>
+                <Text size="sm">{formatDate(record.collectionDate)}</Text>
+                <Text size="sm" c="dimmed">
+                  {bootstrap.data?.unit?.name ?? "Unidade demonstrativa"}
+                </Text>
+                <Group gap="xs">
+                  <CollectionStatusBadge status={record.collectionStatus} />
+                  <SyncStatusBadge status={record.syncStatus} />
+                </Group>
+                <Text size="sm">Completude: {getRecordCompletion(record).overallCompletionPercentage}%</Text>
+                <Text size="sm">Versão: {record.versionNumber > 0 ? record.versionNumber : "Rascunho"}</Text>
+                <Text size="sm">Atualizado em: {new Date(record.updatedAt).toLocaleString("pt-BR")}</Text>
+                <Group gap="xs" wrap="wrap">
+                  <Button size="xs" variant="light" onClick={() => navigate(`/registros/${record.id}`)}>
+                    Ver detalhes
+                  </Button>
+                  {(record.collectionStatus === "in_progress" || record.collectionStatus === "ready_for_review") ? (
+                    <Button size="xs" onClick={() => navigate(`/coleta/${record.id}`)}>
+                      Continuar
+                    </Button>
+                  ) : null}
+                  {record.collectionStatus === "closed" && (record.syncStatus === "pending" || record.syncStatus === "error") ? (
+                    <Button size="xs" onClick={() => void handleRetrySync(record)} loading={busyRecordId === record.id} disabled={busyRecordId !== null}>
+                      Enviar
+                    </Button>
+                  ) : null}
+                </Group>
+              </Stack>
+            </Card>
+          ))}
+        </Stack>
         {sortedRecords.length === 0 ? (
           <Text c="dimmed" mt="md">
             Nenhuma coleta disponível neste dispositivo para o filtro atual.
@@ -229,4 +266,11 @@ export function RecordsPage() {
       </Card>
     </Stack>
   );
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Data não informada";
+  }
+  return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
 }

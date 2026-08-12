@@ -22,6 +22,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeRecord, setActiveRecord] = useState<LocalSubmissionRecord | null>(null);
+  const [periodRecords, setPeriodRecords] = useState<LocalSubmissionRecord[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
@@ -72,12 +73,20 @@ export function HomePage() {
       ]);
 
       setActiveRecord(active);
+      setPeriodRecords(records);
       setPendingCount(records.filter((record) => record.collectionStatus === "closed" && ["pending", "error"].includes(record.syncStatus)).length);
     };
     void load();
   }, [bootstrap.data, localDataRevision, selectedPeriod]);
 
   const completeness = useMemo(() => getRecordCompletion(activeRecord).overallCompletionPercentage, [activeRecord]);
+  const activeDraftCount = useMemo(
+    () =>
+      periodRecords.filter((record) => record.collectionStatus === "in_progress" || record.collectionStatus === "ready_for_review")
+        .length,
+    [periodRecords],
+  );
+  const periodRecordCount = periodRecords.length;
   const yearOptions = useMemo(
     () =>
       [...new Set((bootstrap.data?.reportingPeriods ?? []).map((period) => String(period.reference_year)))].map((year) => ({
@@ -116,19 +125,6 @@ export function HomePage() {
     setFeedbackMessage(null);
     setIsStarting(true);
     try {
-      const existing = await collectionService.getActiveCollection(bootstrap.data, selectedPeriod);
-      if (existing) {
-        const shouldContinue = window.confirm(
-          `Já existe uma coleta para ${selectedPeriod.label} nesta unidade.\n\nDeseja continuar a coleta existente?`,
-        );
-        if (shouldContinue) {
-          navigate(`/coleta/${existing.id}`);
-        } else {
-          setFeedbackMessage(`Já existe uma coleta para ${selectedPeriod.label} nesta unidade.`);
-        }
-        return;
-      }
-
       const created = await collectionService.startCollection(bootstrap.data, bootstrap.data.catalog, selectedPeriod);
       navigate(`/coleta/${created.id}`);
     } catch (error) {
@@ -192,23 +188,32 @@ export function HomePage() {
       <Card withBorder radius="md">
         <Stack gap="sm">
           <Text fw={600}>Coleta atual</Text>
+          <Text size="sm">{selectedPeriod?.label ?? "Período não selecionado"}</Text>
+          <Text c="dimmed" size="sm">
+            {periodRecordCount} coleta(s) registrada(s) neste período.
+          </Text>
           {activeRecord ? (
             <>
               <Group>
                 <CollectionStatusBadge status={activeRecord.collectionStatus} />
                 <SyncStatusBadge status={activeRecord.syncStatus} />
               </Group>
+              <Text size="sm">{activeDraftCount} coleta(s) em preenchimento.</Text>
+              <Text size="sm">Data da coleta: {formatDate(activeRecord.collectionDate)}</Text>
               <Text size="sm">Completude: {completeness}%</Text>
               <Text size="sm">
-                Última gravação: {new Date(activeRecord.lastSavedAt).toLocaleString("pt-BR")}
+                Última gravação: {new Date(activeRecord.updatedAt).toLocaleString("pt-BR")}
               </Text>
               <Group>
-                <Button onClick={() => navigate(`/coleta/${activeRecord.id}`)}>Continuar coleta</Button>
+                <Button onClick={() => navigate(`/coleta/${activeRecord.id}`)}>Continuar</Button>
+                <Button variant="light" onClick={() => void handleStartCollection()} loading={isStarting} disabled={!selectedPeriod}>
+                  Iniciar nova coleta
+                </Button>
               </Group>
             </>
           ) : (
             <>
-              <Text c="dimmed">Nenhuma coleta iniciada para {selectedPeriod?.label ?? "o período selecionado"}.</Text>
+              <Text c="dimmed">Nenhuma coleta em preenchimento para {selectedPeriod?.label ?? "o período selecionado"}.</Text>
               <Button onClick={() => void handleStartCollection()} loading={isStarting} disabled={!selectedPeriod}>
                 Iniciar nova coleta
               </Button>
@@ -229,6 +234,13 @@ export function HomePage() {
       ) : null}
     </Stack>
   );
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Data não informada";
+  }
+  return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
 }
 
 function MetricCard({ title, value }: { title: string; value: string }) {

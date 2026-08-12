@@ -25,6 +25,20 @@ function ensureCollectionContext(bootstrap: BootstrapPayload, period?: Reporting
   };
 }
 
+function getDefaultCollectionDate(reportingPeriod: ReportingPeriodContext) {
+  const today = new Date();
+  const todayIso = today.toISOString().slice(0, 10);
+  if (todayIso >= reportingPeriod.start_date && todayIso <= reportingPeriod.end_date) {
+    return todayIso;
+  }
+
+  return reportingPeriod.start_date;
+}
+
+export function isCollectionDateWithinPeriod(collectionDate: string, reportingPeriod: ReportingPeriodContext) {
+  return collectionDate >= reportingPeriod.start_date && collectionDate <= reportingPeriod.end_date;
+}
+
 export const collectionService = {
   async getActiveCollection(bootstrap: BootstrapPayload, period?: ReportingPeriodContext | null) {
     const { unit, reportingPeriod } = ensureCollectionContext(bootstrap, period);
@@ -45,17 +59,13 @@ export const collectionService = {
 
   async startCollection(bootstrap: BootstrapPayload, catalog: MethodologyCatalog, period?: ReportingPeriodContext | null) {
     const { unit, reportingPeriod } = ensureCollectionContext(bootstrap, period);
-    const existing = await submissionLocalRepository.findActiveByContext(unit.id, reportingPeriod.id);
-    if (existing) {
-      return existing;
-    }
-
     const initialResponses = createInitialResponses(catalog);
     return submissionLocalRepository.createCollection({
       institutionId: bootstrap.institution.id,
       unitId: unit.id,
       reportingPeriodId: reportingPeriod.id,
       reportingPeriodLabel: reportingPeriod.label,
+      collectionDate: getDefaultCollectionDate(reportingPeriod),
       cycleUuid: crypto.randomUUID(),
       responsibleUsername: bootstrap.user.username,
       responsibleDisplayName: bootstrap.user.fullName,
@@ -70,7 +80,12 @@ export const collectionService = {
     return submissionLocalRepository.updateReportingPeriod(recordId, {
       reportingPeriodId: reportingPeriod.id,
       reportingPeriodLabel: reportingPeriod.label,
+      collectionDate: getDefaultCollectionDate(reportingPeriod),
     });
+  },
+
+  async updateCollectionDate(recordId: string, collectionDate: string) {
+    return submissionLocalRepository.updateCollectionDate(recordId, collectionDate);
   },
 
   async saveCollection(

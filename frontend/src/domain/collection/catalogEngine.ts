@@ -11,8 +11,9 @@ import type {
 } from "../../types/submission";
 
 const derivedTotalLabels: Record<string, string> = {
-  donation_capture: "Total de doações",
+  donor_profile: "Total de doações",
   clinical_screening: "Total de candidatos",
+  laboratory_screening: "Total de amostras testadas",
 };
 
 function toNumber(value: CollectionResponseValue): number | null {
@@ -24,6 +25,27 @@ function toNumber(value: CollectionResponseValue): number | null {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+function deriveVariableValue(
+  variable: CollectionVariableDefinition,
+  responses: CollectionResponseMap,
+): CollectionResponseValue {
+  if (!variable.read_only) {
+    return responses[variable.code];
+  }
+
+  if (variable.derived_value_operation === "sum" && variable.derived_value_sources?.length) {
+    const values = variable.derived_value_sources
+      .map((sourceCode) => toNumber(responses[sourceCode]))
+      .filter((value): value is number => value !== null);
+    if (values.length === 0) {
+      return responses[variable.code] ?? null;
+    }
+    return values.reduce((total, value) => total + value, 0);
+  }
+
+  return responses[variable.code] ?? null;
 }
 
 export function normalizeResponseValue(
@@ -49,10 +71,15 @@ export function normalizeResponseMap(
   catalog: MethodologyCatalog,
   responses: CollectionResponseMap,
 ): CollectionResponseMap {
-  return catalog.variables.reduce<CollectionResponseMap>((normalized, variable) => {
-    normalized[variable.code] = normalizeResponseValue(variable, responses[variable.code]);
-    return normalized;
+  const normalized = catalog.variables.reduce<CollectionResponseMap>((accumulator, variable) => {
+    accumulator[variable.code] = normalizeResponseValue(variable, responses[variable.code]);
+    return accumulator;
   }, {});
+
+  return catalog.variables.reduce<CollectionResponseMap>((accumulator, variable) => {
+    accumulator[variable.code] = normalizeResponseValue(variable, deriveVariableValue(variable, accumulator));
+    return accumulator;
+  }, normalized);
 }
 
 export function getSortedModules(catalog: MethodologyCatalog): CollectionModuleDefinition[] {
@@ -66,6 +93,124 @@ export function getVariablesForModule(
   return catalog.variables
     .filter((variable) => variable.module_code === moduleCode && variable.active)
     .sort((left, right) => left.display_order - right.display_order);
+}
+
+export function getSectionsForModule(
+  catalog: MethodologyCatalog,
+  moduleCode: string,
+): Array<{
+  code: string;
+  name: string;
+  description: string;
+  layout: "fields" | "matrix";
+  variables: CollectionVariableDefinition[];
+}> {
+  const groupedSections = new Map<
+    string,
+    {
+      code: string;
+      name: string;
+      description: string;
+      layout: "fields" | "matrix";
+      order: number;
+      variables: CollectionVariableDefinition[];
+    }
+  >();
+
+  getVariablesForModule(catalog, moduleCode).forEach((variable) => {
+    const sectionCode = variable.section_code ?? `${moduleCode}_general`;
+    const section = groupedSections.get(sectionCode) ?? {
+      code: sectionCode,
+      name: variable.section_name ?? "Dados gerais",
+      description: variable.section_description ?? "Informe os dados agregados desta seção.",
+      layout: variable.section_layout ?? "fields",
+      order: variable.display_order,
+      variables: [],
+    };
+    section.variables.push(variable);
+    section.order = Math.min(section.order, variable.display_order);
+    groupedSections.set(sectionCode, section);
+  });
+
+  return [...groupedSections.values()]
+    .sort((left, right) => left.order - right.order)
+    .map((section) => ({
+      code: section.code,
+      name: section.name,
+      description: section.description,
+      layout: section.layout,
+      variables: [...section.variables].sort((left, right) => left.display_order - right.display_order),
+    }));
+}
+
+export function getMatricesForSection(variables: CollectionVariableDefinition[]) {
+  const matrices = new Map<
+    string,
+    {
+      code: string;
+      name: string;
+      description: string;
+      rows: Array<{
+        code: string;
+        label: string;
+        order: number;
+        variables: CollectionVariableDefinition[];
+      }>;
+      columns: Array<{ code: string; label: string; order: number }>;
+    }
+  >();
+
+  variables.forEach((variable) => {
+    const matrixCode = variable.matrix_code ?? "default_matrix";
+    const matrix = matrices.get(matrixCode) ?? {
+      code: matrixCode,
+      name: variable.matrix_name ?? "Tabela agregada",
+      description: variable.matrix_description ?? "Informe os valores agregados por linha.",
+      rows: [],
+      columns: [],
+    };
+
+    const rowCode = variable.matrix_row_code ?? variable.code;
+    const rowLabel = variable.matrix_row_label ?? variable.name;
+    const rowOrder = variable.matrix_row_order ?? variable.display_order;
+    const columnCode = variable.matrix_column_code ?? variable.code;
+    const columnLabel = variable.matrix_column_label ?? variable.name;
+    const columnOrder = variable.matrix_column_order ?? variable.display_order;
+    const row =
+      matrix.rows.find((candidate) => candidate.code === rowCode) ??
+      (() => {
+        const nextRow = {
+          code: rowCode,
+          label: rowLabel,
+          order: rowOrder,
+          variables: [] as CollectionVariableDefinition[],
+        };
+        matrix.rows.push(nextRow);
+        return nextRow;
+      })();
+    row.variables.push(variable);
+
+    if (!matrix.columns.some((candidate) => candidate.code === columnCode)) {
+      matrix.columns.push({ code: columnCode, label: columnLabel, order: columnOrder });
+    }
+
+    matrices.set(matrixCode, matrix);
+  });
+
+  return [...matrices.values()].map((matrix) => ({
+    ...matrix,
+    rows: matrix.rows
+      .sort((left, right) => left.order - right.order)
+      .map((row) => ({
+        ...row,
+        variables: row.variables.sort(
+          (left, right) =>
+            (left.matrix_column_order ?? left.display_order) -
+            (right.matrix_column_order ?? right.display_order),
+        ),
+      })),
+    columns: matrix.columns.sort((left, right) => left.order - right.order),
+  }));
 }
 
 export function isValueFilled(variable: CollectionVariableDefinition, value: CollectionResponseValue) {
@@ -85,10 +230,32 @@ export function isValueFilled(variable: CollectionVariableDefinition, value: Col
 }
 
 export function createInitialResponses(catalog: MethodologyCatalog): CollectionResponseMap {
-  return catalog.variables.reduce<CollectionResponseMap>((responses, variable) => {
-    responses[variable.code] = variable.variable_type === "text" ? "" : null;
-    return responses;
+  const responses = catalog.variables.reduce<CollectionResponseMap>((nextResponses, variable) => {
+    nextResponses[variable.code] = variable.variable_type === "text" ? "" : null;
+    return nextResponses;
   }, {});
+
+  return normalizeResponseMap(catalog, responses);
+}
+
+export function buildSectionStatus(
+  variables: CollectionVariableDefinition[],
+  responses: CollectionResponseMap,
+) {
+  const requiredVariables = variables.filter((variable) => variable.required && !variable.read_only);
+  const completedRequiredFields = requiredVariables.filter((variable) =>
+    isValueFilled(variable, responses[variable.code]),
+  ).length;
+  const requiredFields = requiredVariables.length;
+  const percentage =
+    requiredFields === 0 ? 100 : Math.round((completedRequiredFields / requiredFields) * 100);
+
+  return {
+    requiredFields,
+    completedRequiredFields,
+    percentage,
+    isComplete: requiredFields === 0 || completedRequiredFields === requiredFields,
+  };
 }
 
 export function calculateCompleteness(
@@ -96,7 +263,9 @@ export function calculateCompleteness(
   responses: CollectionResponseMap,
 ): ModuleCompleteness[] {
   return getSortedModules(catalog).map((module) => {
-    const requiredVariables = getVariablesForModule(catalog, module.code).filter((variable) => variable.required);
+    const requiredVariables = getVariablesForModule(catalog, module.code).filter(
+      (variable) => variable.required && !variable.read_only,
+    );
     const completedRequiredFields = requiredVariables.filter((variable) =>
       isValueFilled(variable, responses[variable.code]),
     ).length;
@@ -139,7 +308,12 @@ export function calculateCollectionCompletion(
   const completenessByModule = calculateCompleteness(catalog, normalizedResponses);
   const overallCompletion = calculateOverallCompletion(completenessByModule);
   const missingRequiredFields = catalog.variables
-    .filter((variable) => variable.required && !isValueFilled(variable, normalizedResponses[variable.code]))
+    .filter(
+      (variable) =>
+        variable.required &&
+        !variable.read_only &&
+        !isValueFilled(variable, normalizedResponses[variable.code]),
+    )
     .map((variable) => variable.name);
 
   return {
@@ -215,6 +389,10 @@ export function buildValidationSummary(
   const inconsistencies: string[] = [];
 
   for (const variable of catalog.variables) {
+    if (variable.read_only) {
+      continue;
+    }
+
     const value = normalizedResponses[variable.code];
 
     if (variable.required && !isValueFilled(variable, value)) {
@@ -269,7 +447,7 @@ export function buildValidationSummary(
     donationReplacement !== null &&
     donationVoluntary + donationReplacement <= 0
   ) {
-    inconsistencies.push("Doação e captação: o total de doações deve ser maior que zero.");
+    inconsistencies.push("Triagem clínica: o total de doações deve ser maior que zero.");
   }
 
   const clinicalEligible = toNumber(normalizedResponses.candidatos_aptos);
@@ -289,8 +467,24 @@ export function buildValidationSummary(
     reactiveSamples !== null &&
     reactiveSamples > testedSamples
   ) {
-    inconsistencies.push("Triagem laboratorial: amostras reagentes não podem exceder amostras testadas.");
+    inconsistencies.push("Exames realizados: amostras reagentes não podem exceder amostras testadas.");
   }
+
+  Object.entries(normalizedResponses)
+    .filter(([code]) => code.startsWith("exame_") && code.endsWith("_testadas"))
+    .forEach(([testedCode, testedValue]) => {
+      const reactiveCode = testedCode.replace("_testadas", "_reagentes");
+      const testedNumeric = toNumber(testedValue);
+      const reactiveNumeric = toNumber(normalizedResponses[reactiveCode]);
+      const examName = testedCode
+        .replace("exame_", "")
+        .replace("_testadas", "")
+        .replace(/_/g, " ");
+
+      if (testedNumeric !== null && reactiveNumeric !== null && reactiveNumeric > testedNumeric) {
+        inconsistencies.push(`Exames realizados: ${examName} não pode ter reagentes acima de testadas.`);
+      }
+    });
 
   for (const indicator of calculatedIndicators) {
     if (indicator.numeratorValue !== null && indicator.denominatorValue === 0) {
@@ -309,8 +503,12 @@ export function buildValidationSummary(
     valid: missingRequiredFields.length === 0 && inconsistencies.length === 0,
     missingRequiredFields,
     inconsistencies,
-    completeModules: completion.completenessByModule.filter((module) => module.isComplete).map((module) => module.moduleName),
-    incompleteModules: completion.completenessByModule.filter((module) => !module.isComplete).map((module) => module.moduleName),
+    completeModules: completion.completenessByModule
+      .filter((module) => module.isComplete)
+      .map((module) => module.moduleName),
+    incompleteModules: completion.completenessByModule
+      .filter((module) => !module.isComplete)
+      .map((module) => module.moduleName),
     completenessByModule: completion.completenessByModule,
     requiredFields: completion.requiredFields,
     completedRequiredFields: completion.completedRequiredFields,
@@ -320,6 +518,7 @@ export function buildValidationSummary(
 }
 
 export function summarizeCatalogVersion(catalog: MethodologyCatalog) {
-  const modules = getSortedModules(catalog).map((module) => `${module.code}@${module.version}`);
-  return modules.join(", ");
+  const modules = getSortedModules(catalog);
+  const activeVariables = catalog.variables.filter((variable) => variable.active).length;
+  return `Módulos ${modules.length} · Variáveis ${activeVariables} · Indicadores ${catalog.indicators.length}`;
 }

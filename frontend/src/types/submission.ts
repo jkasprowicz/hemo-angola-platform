@@ -4,6 +4,14 @@ export type DisplayRole = "Operador" | "Revisor" | "Gestor" | "Administrador" | 
 export type CollectionVariableType = "integer" | "decimal" | "text" | "select" | "boolean";
 export type IndicatorDimension = "structure" | "process" | "result";
 export type FormulaKind = "ratio_percentage" | "share_of_sum_percentage";
+export type CatalogStatus =
+  | "demonstrativo"
+  | "candidato"
+  | "validado_por_consenso"
+  | "em_piloto"
+  | "aprovado";
+export type CollectionSectionLayout = "fields" | "matrix";
+export type DerivedValueOperation = "sum";
 
 export type CollectionStatus =
   | "in_progress"
@@ -35,6 +43,7 @@ export type CollectionModuleDefinition = {
   valid_from: string | null;
   valid_to: string | null;
   is_demo: boolean;
+  status?: CatalogStatus;
 };
 
 export type CollectionVariableDefinition = {
@@ -56,6 +65,23 @@ export type CollectionVariableDefinition = {
   version: number;
   select_options: string[];
   is_demo: boolean;
+  status?: CatalogStatus;
+  section_code?: string | null;
+  section_name?: string | null;
+  section_description?: string | null;
+  section_layout?: CollectionSectionLayout | null;
+  matrix_code?: string | null;
+  matrix_name?: string | null;
+  matrix_description?: string | null;
+  matrix_row_code?: string | null;
+  matrix_row_label?: string | null;
+  matrix_row_order?: number | null;
+  matrix_column_code?: string | null;
+  matrix_column_label?: string | null;
+  matrix_column_order?: number | null;
+  read_only?: boolean;
+  derived_value_operation?: DerivedValueOperation | null;
+  derived_value_sources?: string[];
 };
 
 export type IndicatorDefinition = {
@@ -78,6 +104,7 @@ export type IndicatorDefinition = {
   valid_to: string | null;
   interpretation: string;
   is_demo: boolean;
+  status?: CatalogStatus;
 };
 
 export type MethodologyCatalog = {
@@ -133,14 +160,17 @@ export type CollectionCyclePayload = {
   unitId: number;
   reportingPeriodId: number;
   reportingPeriodLabel: string;
+  collectionDate: string | null;
   responsibleUsername: string;
   version: number;
   collectionStatus: CollectionStatus;
   syncStatus: SyncStatus;
   generalObservation: string;
   catalogVersionSummary: string;
-  lastSavedAt: string;
+  updatedAt: string;
   closedAt: string | null;
+  submittedAt: string | null;
+  receivedAt: string | null;
   responses: CollectionResponseMap;
   validationSummary: ValidationSummary;
 };
@@ -172,6 +202,7 @@ export type RecordEvent = {
   entityId: string;
   unitId: number;
   reportingPeriodId: number;
+  collectionDate: string | null;
   correlationId: string;
   source: "local" | "client_offline" | "server";
   metadata: Record<string, unknown>;
@@ -190,6 +221,7 @@ export type LocalSubmissionRecord = {
   unitId: number;
   reportingPeriodId: number;
   reportingPeriodLabel: string;
+  collectionDate: string | null;
   cycleUuid: string;
   responsibleUsername: string;
   responsibleDisplayName: string;
@@ -204,8 +236,10 @@ export type LocalSubmissionRecord = {
   versionNumber: number;
   basedOnRecordId: string | null;
   createdAt: string;
-  lastSavedAt: string;
+  updatedAt: string;
   closedAt: string | null;
+  submittedAt: string | null;
+  receivedAt: string | null;
   syncedAt: string | null;
   acceptedAt: string | null;
   lastSyncAttemptAt: string | null;

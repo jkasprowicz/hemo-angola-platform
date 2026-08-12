@@ -165,25 +165,23 @@ class AuthAndSyncFlowTests(TestCase):
         self.assertIn("reportingPeriodPolicy", response.data)
         self.assertIn("start_date", response.data["reportingPeriod"])
         self.assertIn("end_date", response.data["reportingPeriod"])
-        self.assertEqual(len(response.data["catalog"]["modules"]), 3)
-        self.assertEqual(len(response.data["catalog"]["variables"]), 6)
+        self.assertEqual(len(response.data["catalog"]["modules"]), 5)
+        self.assertEqual(len(response.data["catalog"]["variables"]), 39)
         self.assertEqual(len(response.data["catalog"]["indicators"]), 3)
         self.assertEqual(
             [module["code"] for module in response.data["catalog"]["modules"]],
             [
-                "donation_capture",
                 "clinical_screening",
+                "collection_operations",
                 "laboratory_screening",
+                "hemotherapy_production",
+                "transfusion_distribution",
             ],
         )
-        self.assertNotIn(
-            "delayed_serology_releases_count",
-            [variable["code"] for variable in response.data["catalog"]["variables"]],
-        )
-        self.assertNotIn(
-            "processed_units_count",
-            [variable["code"] for variable in response.data["catalog"]["variables"]],
-        )
+        variable_codes = [variable["code"] for variable in response.data["catalog"]["variables"]]
+        self.assertIn("exame_hiv_testadas", variable_codes)
+        self.assertIn("producao_hemacias_produzidas", variable_codes)
+        self.assertIn("transfusao_hemacias_ambulatorial", variable_codes)
 
     @override_settings(CSRF_TRUSTED_ORIGINS=["http://localhost:5173", "http://127.0.0.1:5173"])
     def test_sync_persists_submission_data_and_is_idempotent(self):
@@ -203,9 +201,11 @@ class AuthAndSyncFlowTests(TestCase):
                     "institution_id": institution["id"],
                     "unit_id": unit["id"],
                     "reporting_period_id": period["id"],
+                    "collection_date": "2026-08-08",
                     "payload": {"field": "value"},
                     "validation_summary": {"valid": True},
                     "closed_at": "2026-08-08T00:00:00Z",
+                    "submitted_at": "2026-08-08T00:05:00Z",
                 }
             ]
         }
@@ -283,8 +283,8 @@ class SeedDemoDataTests(TestCase):
         with demo_password():
             call_command("seed_demo_data", reset=True)
 
-        self.assertEqual(CollectionModule.objects.filter(is_demo=True).count(), 3)
-        self.assertEqual(CollectionVariable.objects.filter(is_demo=True).count(), 6)
+        self.assertEqual(CollectionModule.objects.filter(is_demo=True).count(), 5)
+        self.assertEqual(CollectionVariable.objects.filter(is_demo=True).count(), 39)
         self.assertEqual(IndicatorDefinition.objects.filter(is_demo=True).count(), 3)
         self.assertEqual(UserProfile.objects.filter(user__username="operador", role="operator").count(), 1)
 

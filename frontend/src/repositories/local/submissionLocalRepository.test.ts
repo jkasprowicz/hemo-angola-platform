@@ -29,6 +29,7 @@ describe("submissionLocalRepository", () => {
       unitId: 1,
       reportingPeriodId: 1,
       reportingPeriodLabel: "Agosto/2026",
+      collectionDate: "2026-08-10",
       responses: {
         donacoes_voluntarias: 12,
         donacoes_reposicao: 15,
@@ -67,6 +68,7 @@ describe("submissionLocalRepository", () => {
       unitId: 1,
       reportingPeriodId: 1,
       reportingPeriodLabel: "Agosto/2026",
+      collectionDate: "2026-08-10",
       responses: {
         donacoes_voluntarias: 320,
         donacoes_reposicao: 680,
@@ -112,6 +114,7 @@ describe("submissionLocalRepository", () => {
       unitId: 1,
       reportingPeriodId: 1,
       reportingPeriodLabel: "Agosto/2026",
+      collectionDate: "2026-08-10",
       responses: {
         donacoes_voluntarias: 320,
         donacoes_reposicao: 680,

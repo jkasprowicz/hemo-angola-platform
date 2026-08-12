@@ -57,6 +57,9 @@ export type DashboardTraceRecord = {
   version_uuid: string;
   version_number: number;
   status: string;
+  collection_date: string | null;
+  closed_at?: string | null;
+  submitted_at?: string | null;
   received_at: string;
   unit_id: number;
   reporting_period_id: number;

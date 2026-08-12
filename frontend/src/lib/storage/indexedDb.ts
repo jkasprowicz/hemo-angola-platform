@@ -4,7 +4,7 @@ import type { AuditTrailEvent, LocalSubmissionRecord, SyncQueueItem } from "../.
 
 
 const DB_NAME = "hemo-angola-prototype";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 const RECORD_STORE = "submission_records";
 const QUEUE_STORE = "sync_queue";
@@ -14,6 +14,27 @@ const AUDIT_STORE = "audit_events";
 let databasePromise: ReturnType<typeof openDB> | null = null;
 let localDataRevision = 0;
 const localDataListeners = new Set<() => void>();
+
+function normalizeLegacyRecord(record: LocalSubmissionRecord): LocalSubmissionRecord {
+  const legacyRecord = record as LocalSubmissionRecord & {
+    lastSavedAt?: string;
+    collectionDate?: string | null;
+    submittedAt?: string | null;
+    receivedAt?: string | null;
+  };
+
+  return {
+    ...record,
+    collectionDate: legacyRecord.collectionDate ?? null,
+    updatedAt: record.updatedAt ?? legacyRecord.lastSavedAt ?? record.createdAt,
+    submittedAt: record.submittedAt ?? legacyRecord.submittedAt ?? null,
+    receivedAt: record.receivedAt ?? legacyRecord.receivedAt ?? null,
+    eventHistory: record.eventHistory.map((event) => ({
+      ...event,
+      collectionDate: event.collectionDate ?? legacyRecord.collectionDate ?? null,
+    })),
+  };
+}
 
 function notifyLocalDataChanged() {
   localDataRevision += 1;
@@ -76,12 +97,13 @@ export async function putRecord(record: LocalSubmissionRecord) {
 
 export async function getRecord(recordId: string) {
   const db = await getDatabase();
-  return (await db.get(RECORD_STORE, recordId)) as LocalSubmissionRecord | undefined;
+  const record = (await db.get(RECORD_STORE, recordId)) as LocalSubmissionRecord | undefined;
+  return record ? normalizeLegacyRecord(record) : undefined;
 }
 
 export async function getRecords() {
   const db = await getDatabase();
-  return (await db.getAll(RECORD_STORE)) as LocalSubmissionRecord[];
+  return ((await db.getAll(RECORD_STORE)) as LocalSubmissionRecord[]).map(normalizeLegacyRecord);
 }
 
 export async function deleteRecord(recordId: string) {

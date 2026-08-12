@@ -36,7 +36,7 @@ function createEvent(
   action: string,
   occurredAt: string,
   label: string,
-  record: Pick<LocalSubmissionRecord, "id" | "unitId" | "reportingPeriodId" | "responsibleDisplayName" | "responsibleRole">,
+  record: Pick<LocalSubmissionRecord, "id" | "unitId" | "reportingPeriodId" | "collectionDate" | "responsibleDisplayName" | "responsibleRole">,
   options?: {
     detail?: string | null;
     entityType?: string;
@@ -60,6 +60,7 @@ function createEvent(
     entityId: options?.entityId ?? record.id,
     unitId: record.unitId,
     reportingPeriodId: record.reportingPeriodId,
+    collectionDate: record.collectionDate,
     correlationId: options?.correlationId ?? crypto.randomUUID(),
     source: options?.source ?? "local",
     metadata: options?.metadata ?? {},
@@ -89,14 +90,14 @@ async function deleteQueueItemsForRecord(recordId: string) {
 export const submissionLocalRepository = {
   async findActiveByContext(unitId: number, reportingPeriodId: number) {
     const records = await getRecords();
-    return (
-      records.find(
+    return records
+      .filter(
         (record) =>
           record.unitId === unitId &&
           record.reportingPeriodId === reportingPeriodId &&
           isActiveCollectionStatus(record.collectionStatus),
-      ) ?? null
-    );
+      )
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0] ?? null;
   },
 
   async createCollection(input: {
@@ -104,6 +105,7 @@ export const submissionLocalRepository = {
     unitId: number;
     reportingPeriodId: number;
     reportingPeriodLabel: string;
+    collectionDate: string;
     cycleUuid: string;
     responsibleUsername: string;
     responsibleDisplayName: string;
@@ -112,11 +114,6 @@ export const submissionLocalRepository = {
     validationSummary: ValidationSummary;
     catalogVersionSummary: string;
   }) {
-    const existing = await this.findActiveByContext(input.unitId, input.reportingPeriodId);
-    if (existing) {
-      return existing;
-    }
-
     const now = new Date().toISOString();
     const record: LocalSubmissionRecord = {
       id: crypto.randomUUID(),
@@ -124,6 +121,7 @@ export const submissionLocalRepository = {
       unitId: input.unitId,
       reportingPeriodId: input.reportingPeriodId,
       reportingPeriodLabel: input.reportingPeriodLabel,
+      collectionDate: input.collectionDate,
       cycleUuid: input.cycleUuid,
       responsibleUsername: input.responsibleUsername,
       responsibleDisplayName: input.responsibleDisplayName,
@@ -138,8 +136,10 @@ export const submissionLocalRepository = {
       versionNumber: 0,
       basedOnRecordId: null,
       createdAt: now,
-      lastSavedAt: now,
+      updatedAt: now,
       closedAt: null,
+      submittedAt: null,
+      receivedAt: null,
       syncedAt: null,
       acceptedAt: null,
       lastSyncAttemptAt: null,
@@ -148,7 +148,11 @@ export const submissionLocalRepository = {
       eventHistory: [],
     };
     const initialEvent = createEvent("collection_created", "COLLECTION_CREATED", now, "Coleta iniciada", record, {
-      after: { reportingPeriodId: record.reportingPeriodId, reportingPeriodLabel: record.reportingPeriodLabel },
+      after: {
+        reportingPeriodId: record.reportingPeriodId,
+        reportingPeriodLabel: record.reportingPeriodLabel,
+        collectionDate: record.collectionDate,
+      },
       correlationId: record.cycleUuid,
     });
     record.eventHistory = [initialEvent];
@@ -181,7 +185,7 @@ export const submissionLocalRepository = {
       generalObservation: input.generalObservation,
       responses: input.responses,
       validationSummary: input.validationSummary,
-      lastSavedAt: now,
+      updatedAt: now,
       lastError: null,
     };
     let updatedRecord = await appendEvent(
@@ -233,7 +237,7 @@ export const submissionLocalRepository = {
     reportingPeriodId?: number;
   }) {
     let records = await getRecords();
-    records = records.sort((left, right) => right.lastSavedAt.localeCompare(left.lastSavedAt));
+    records = records.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
     if (filters?.collectionStatus) {
       records = records.filter((record) => record.collectionStatus === filters.collectionStatus);
     }
@@ -250,7 +254,7 @@ export const submissionLocalRepository = {
     return getRecord(recordId);
   },
 
-  async updateReportingPeriod(recordId: string, input: { reportingPeriodId: number; reportingPeriodLabel: string }) {
+  async updateReportingPeriod(recordId: string, input: { reportingPeriodId: number; reportingPeriodLabel: string; collectionDate: string }) {
     const record = await getRecord(recordId);
     if (!record) {
       throw new Error("Coleta local não encontrada.");
@@ -259,22 +263,51 @@ export const submissionLocalRepository = {
       throw new Error("O período só pode ser alterado enquanto a coleta estiver em preenchimento.");
     }
 
-    const existing = await this.findActiveByContext(record.unitId, input.reportingPeriodId);
-    if (existing && existing.id !== record.id) {
-      throw new Error(`Já existe uma coleta em andamento para ${input.reportingPeriodLabel}.`);
-    }
-
     const now = new Date().toISOString();
     const updatedRecord = await appendEvent(
       {
         ...record,
         reportingPeriodId: input.reportingPeriodId,
         reportingPeriodLabel: input.reportingPeriodLabel,
-        lastSavedAt: now,
+        collectionDate: input.collectionDate,
+        updatedAt: now,
       },
       createEvent("collection_period_changed", "COLLECTION_PERIOD_CHANGED", now, "Período de referência atualizado", record, {
         before: { reportingPeriodId: record.reportingPeriodId, reportingPeriodLabel: record.reportingPeriodLabel },
-        after: { reportingPeriodId: input.reportingPeriodId, reportingPeriodLabel: input.reportingPeriodLabel },
+        after: {
+          reportingPeriodId: input.reportingPeriodId,
+          reportingPeriodLabel: input.reportingPeriodLabel,
+          collectionDate: input.collectionDate,
+        },
+        correlationId: record.submissionUuid ?? record.cycleUuid,
+      }),
+    );
+
+    await putRecord(updatedRecord);
+    return updatedRecord;
+  },
+
+  async updateCollectionDate(recordId: string, collectionDate: string) {
+    const record = await getRecord(recordId);
+    if (!record) {
+      throw new Error("Coleta local não encontrada.");
+    }
+    if (!isActiveCollectionStatus(record.collectionStatus)) {
+      throw new Error("A data da coleta só pode ser alterada enquanto a coleta estiver em preenchimento.");
+    }
+
+    const now = new Date().toISOString();
+    const updatedRecord = await appendEvent(
+      {
+        ...record,
+        collectionDate,
+        updatedAt: now,
+      },
+      createEvent("field_updated", "COLLECTION_DATE_UPDATED", now, "Data da coleta atualizada", record, {
+        entityType: "collection_date",
+        entityId: "collectionDate",
+        before: { collectionDate: record.collectionDate },
+        after: { collectionDate },
         correlationId: record.submissionUuid ?? record.cycleUuid,
       }),
     );
@@ -309,12 +342,18 @@ export const submissionLocalRepository = {
         syncStatus: "pending",
         validationSummary,
         closedAt,
-        lastSavedAt: closedAt,
+        updatedAt: closedAt,
         lastError: null,
       },
       createEvent("collection_closed", "COLLECTION_CLOSED", closedAt, "Coleta fechada e pronta para envio", record, {
         correlationId: submissionUuid,
-        after: { submissionUuid, versionUuid, versionNumber: 1 },
+        after: {
+          submissionUuid,
+          versionUuid,
+          versionNumber: 1,
+          collectionDate: record.collectionDate,
+          closedAt,
+        },
       }),
     );
 
@@ -357,7 +396,8 @@ export const submissionLocalRepository = {
         versionUuid: null,
         versionNumber: 0,
         closedAt: null,
-        lastSavedAt: now,
+        submittedAt: null,
+        updatedAt: now,
         lastError: null,
       },
       createEvent("collection_reopened", "COLLECTION_REOPENED", now, "Coleta reaberta para correção", record, {
@@ -405,6 +445,7 @@ export const submissionLocalRepository = {
         {
           ...record,
           syncStatus: "syncing",
+          submittedAt: record.submittedAt ?? now,
           lastError: null,
           lastSyncAttemptAt: now,
         },
@@ -432,9 +473,10 @@ export const submissionLocalRepository = {
           ...record,
           collectionStatus: "received",
           syncStatus: "synced",
+          receivedAt: syncedAt,
           syncedAt,
           acceptedAt: null,
-          lastSavedAt: syncedAt,
+          updatedAt: syncedAt,
           lastSyncAttemptAt: syncedAt,
           lastError: null,
         },
@@ -464,7 +506,7 @@ export const submissionLocalRepository = {
           collectionStatus: "closed",
           syncStatus: "error",
           lastError: errorMessage,
-          lastSavedAt: attemptedAt,
+          updatedAt: attemptedAt,
           lastSyncAttemptAt: attemptedAt,
         },
         createEvent("sync_failed", "SUBMISSION_SYNC_FAILED", attemptedAt, "Erro no envio", record, {
@@ -499,7 +541,7 @@ export const submissionLocalRepository = {
             collectionStatus: "closed",
             syncStatus: "error",
             lastError: errorMessage,
-            lastSavedAt: recoveredAt,
+            updatedAt: recoveredAt,
             lastSyncAttemptAt: recoveredAt,
           },
           createEvent("sync_failed", "SUBMISSION_SYNC_FAILED", recoveredAt, "Envio interrompido", record, {

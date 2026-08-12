@@ -49,6 +49,7 @@ export function SyncPage() {
             .map((event) => ({
               recordId: record.id,
               period: record.reportingPeriodLabel,
+              collectionDate: record.collectionDate,
               result: event.label,
               occurredAt: event.occurredAt,
             })),
@@ -97,7 +98,7 @@ export function SyncPage() {
               A sincronização exige conexão ativa. As coletas continuarão salvas neste dispositivo até novo envio.
             </Alert>
           ) : null}
-          <Group>
+          <Group align="flex-start" wrap="wrap">
             <Checkbox
               label="Selecionar todos"
               checked={allSelected}
@@ -119,11 +120,12 @@ export function SyncPage() {
       <Card withBorder radius="md">
         <Stack gap="sm">
           <Text fw={600}>Pendentes de envio</Text>
-          <Table striped>
+          <Table striped visibleFrom="md">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th></Table.Th>
                 <Table.Th>Período</Table.Th>
+                <Table.Th>Data</Table.Th>
                 <Table.Th>Unidade</Table.Th>
                 <Table.Th>Versão</Table.Th>
                 <Table.Th>Status de envio</Table.Th>
@@ -140,6 +142,7 @@ export function SyncPage() {
                     />
                   </Table.Td>
                   <Table.Td>{record.reportingPeriodLabel}</Table.Td>
+                  <Table.Td>{formatDate(record.collectionDate)}</Table.Td>
                   <Table.Td>{bootstrap.data?.unit?.name ?? "Unidade demonstrativa"}</Table.Td>
                   <Table.Td>{record.versionNumber || 1}</Table.Td>
                   <Table.Td>
@@ -152,6 +155,32 @@ export function SyncPage() {
               ))}
             </Table.Tbody>
           </Table>
+          <Stack gap="sm" hiddenFrom="md">
+            {pendingRecords.map((record) => (
+              <Card key={record.id} withBorder radius="md" p="sm">
+                <Stack gap="xs">
+                  <Group justify="space-between" align="flex-start">
+                    <div>
+                      <Text fw={600}>{record.reportingPeriodLabel}</Text>
+                      <Text size="sm">{formatDate(record.collectionDate)}</Text>
+                    </div>
+                    <Checkbox
+                      checked={selectedRecordIds.includes(record.id)}
+                      onChange={(event) => toggleRecordSelection(record.id, event.currentTarget.checked)}
+                    />
+                  </Group>
+                  <Text size="sm" c="dimmed">
+                    {bootstrap.data?.unit?.name ?? "Unidade demonstrativa"}
+                  </Text>
+                  <SyncStatusBadge status={record.syncStatus} />
+                  <Text size="sm">Versão: {record.versionNumber || 1}</Text>
+                  <Text size="sm">
+                    Última tentativa: {record.lastSyncAttemptAt ? new Date(record.lastSyncAttemptAt).toLocaleString("pt-BR") : "Ainda não tentado"}
+                  </Text>
+                </Stack>
+              </Card>
+            ))}
+          </Stack>
           {pendingRecords.length === 0 ? <Text c="dimmed">Nenhuma coleta fechada aguardando envio.</Text> : null}
         </Stack>
       </Card>
@@ -159,10 +188,11 @@ export function SyncPage() {
       <Card withBorder radius="md">
         <Stack gap="sm">
           <Text fw={600}>Histórico recente</Text>
-          <Table striped>
+          <Table striped visibleFrom="md">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Período</Table.Th>
+                <Table.Th>Data</Table.Th>
                 <Table.Th>Resultado</Table.Th>
                 <Table.Th>Data/hora</Table.Th>
               </Table.Tr>
@@ -171,15 +201,37 @@ export function SyncPage() {
               {syncHistory.map((item) => (
                 <Table.Tr key={`${item.recordId}-${item.occurredAt}`}>
                   <Table.Td>{item.period}</Table.Td>
+                  <Table.Td>{formatDate(item.collectionDate)}</Table.Td>
                   <Table.Td>{item.result}</Table.Td>
                   <Table.Td>{new Date(item.occurredAt).toLocaleString("pt-BR")}</Table.Td>
                 </Table.Tr>
               ))}
             </Table.Tbody>
           </Table>
+          <Stack gap="sm" hiddenFrom="md">
+            {syncHistory.map((item) => (
+              <Card key={`${item.recordId}-${item.occurredAt}`} withBorder radius="md" p="sm">
+                <Stack gap="xs">
+                  <Text fw={600}>{item.period}</Text>
+                  <Text size="sm">{formatDate(item.collectionDate)}</Text>
+                  <Text size="sm">{item.result}</Text>
+                  <Text size="sm" c="dimmed">
+                    {new Date(item.occurredAt).toLocaleString("pt-BR")}
+                  </Text>
+                </Stack>
+              </Card>
+            ))}
+          </Stack>
           {syncHistory.length === 0 ? <Text c="dimmed">Nenhum evento recente de sincronização.</Text> : null}
         </Stack>
       </Card>
     </Stack>
   );
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Data não informada";
+  }
+  return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
 }

@@ -15,7 +15,7 @@ test("unauthenticated user cannot access /dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Entrar" })).toBeVisible();
 });
 
-test("dashboard MVP uses synced backend data and supports period drill-down", async ({ page }) => {
+test("dashboard uses synced backend data and supports period drill-down", async ({ page }) => {
   await login(page);
 
   await page.goto("/dashboard");
@@ -52,26 +52,60 @@ test("dashboard MVP uses synced backend data and supports period drill-down", as
 
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Dashboard de Indicadores Hemoterápicos" })).toBeVisible();
-  const collectionsSummaryCard = page.locator('[data-with-border="true"]').filter({ hasText: "Coletas recebidas" }).first();
-  await expect(collectionsSummaryCard).toContainText("Coletas recebidas");
-  await expect(collectionsSummaryCard).toContainText("2");
+  const contextBar = page.getByTestId("dashboard-context-bar");
+  await expect(contextBar).toContainText("Coletas");
+  await expect(contextBar).toContainText("2");
   await expect(page.getByText("Janeiro/2026 – Fevereiro/2026")).toBeVisible();
   await expect(page.getByText("60,0%")).toBeVisible();
   await expect(page.getByText("12,5%")).toBeVisible();
   await expect(page.locator("text=2,0%").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Janeiro/2026" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Fevereiro/2026" })).toBeVisible();
+  await expect(page.getByLabel("Abrir coletas de Janeiro/2026")).toBeVisible();
+  await expect(page.getByLabel("Abrir coletas de Fevereiro/2026")).toBeVisible();
 
-  await page.getByRole("button", { name: "Fevereiro/2026" }).click();
+  await page.locator("tr", { hasText: "Fevereiro/2026" }).getByRole("button", { name: "Ver coletas" }).click();
   await expect(page).toHaveURL(/\/registros\?period=\d+&source=dashboard$/);
   await expect(page.getByRole("heading", { name: "Registros" })).toBeVisible();
   await expect(page.getByText("Exibindo registros locais filtrados pelo período selecionado no dashboard.")).toBeVisible();
-  await expect(page.getByText("Fevereiro/2026")).toBeVisible();
+  await expect(page.locator("text=Fevereiro/2026").first()).toBeVisible();
 
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   await page.getByRole("button", { name: "Sair" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: "Entrar" })).toBeVisible();
+});
+
+test("dashboard header controls remain accessible across responsive viewports", async ({ page }) => {
+  await login(page);
+
+  for (const viewport of [
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 430, height: 932 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/dashboard");
+
+    const backButton = page.getByRole("button", {
+      name: viewport.width <= 768 ? "Sistema" : "Voltar ao sistema",
+    });
+    const logoutButton = page.getByRole("button", { name: "Sair" });
+
+    await expect(backButton).toBeVisible();
+    await expect(logoutButton).toBeVisible();
+
+    const [backBox, logoutBox] = await Promise.all([backButton.boundingBox(), logoutButton.boundingBox()]);
+    expect(backBox).not.toBeNull();
+    expect(logoutBox).not.toBeNull();
+    expect(backBox!.y + backBox!.height <= logoutBox!.y || logoutBox!.y + logoutBox!.height <= backBox!.y || backBox!.x + backBox!.width <= logoutBox!.x || logoutBox!.x + logoutBox!.width <= backBox!.x).toBeTruthy();
+
+    const hasHorizontalOverflow = await page.evaluate(() => {
+      const root = document.documentElement;
+      return root.scrollWidth > root.clientWidth;
+    });
+    expect(hasHorizontalOverflow).toBeFalsy();
+  }
 });
 
 

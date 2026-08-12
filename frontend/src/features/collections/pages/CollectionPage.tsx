@@ -62,7 +62,7 @@ export function CollectionPage() {
         <Card withBorder radius="md">
           <Stack>
             <Text fw={600}>
-              {record ? "Já existe uma coleta em andamento para este período." : "Nenhuma coleta iniciada neste período."}
+              {record ? "Há pelo menos uma coleta em andamento para este período." : "Nenhuma coleta iniciada neste período."}
             </Text>
             <Button onClick={() => navigate(record ? `/coleta/${record.id}` : "/")}>
               {record ? "Continuar coleta" : "Ir para a Home"}

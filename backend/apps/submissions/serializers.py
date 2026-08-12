@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Submission, SubmissionVersion
+from .models import ReportingPeriod, Submission, SubmissionVersion
 
 
 class SyncItemSerializer(serializers.Serializer):
@@ -11,10 +11,25 @@ class SyncItemSerializer(serializers.Serializer):
     institution_id = serializers.IntegerField()
     unit_id = serializers.IntegerField()
     reporting_period_id = serializers.IntegerField()
+    collection_date = serializers.DateField()
     payload = serializers.JSONField()
     validation_summary = serializers.JSONField(required=False)
     audit_events = serializers.JSONField(required=False)
     closed_at = serializers.DateTimeField()
+    submitted_at = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        period = ReportingPeriod.objects.get(pk=attrs["reporting_period_id"])
+        collection_date = attrs["collection_date"]
+        if collection_date < period.start_date or collection_date > period.end_date:
+            raise serializers.ValidationError(
+                {
+                    "collection_date": (
+                        f"A data da coleta deve pertencer ao período de referência {period.label}."
+                    )
+                }
+            )
+        return attrs
 
 
 class SyncBatchSerializer(serializers.Serializer):
@@ -24,6 +39,9 @@ class SyncBatchSerializer(serializers.Serializer):
 class SubmissionVersionSerializer(serializers.ModelSerializer):
     submission_uuid = serializers.UUIDField(source="submission.client_submission_uuid")
     reporting_period = serializers.CharField(source="submission.reporting_period.label")
+    collection_date = serializers.DateField(source="submission.collection_date", allow_null=True)
+    submitted_at = serializers.DateTimeField(source="submission.submitted_at", allow_null=True)
+    received_at = serializers.DateTimeField(allow_null=True)
 
     class Meta:
         model = SubmissionVersion
@@ -33,7 +51,10 @@ class SubmissionVersionSerializer(serializers.ModelSerializer):
             "version_number",
             "status",
             "reporting_period",
+            "collection_date",
             "created_at",
+            "submitted_at",
+            "received_at",
             "synced_at",
         )
 

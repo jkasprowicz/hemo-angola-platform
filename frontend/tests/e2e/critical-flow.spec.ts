@@ -39,8 +39,8 @@ test("critical local-first flow", async ({ browser }) => {
   await page.reload();
 
   const observationField = page.getByLabel("Observação geral do período");
-  if ((await page.getByRole("button", { name: "Continuar coleta" }).count()) > 0) {
-    await page.getByRole("button", { name: "Continuar coleta" }).click();
+  if ((await page.getByRole("button", { name: "Continuar" }).count()) > 0) {
+    await page.getByRole("button", { name: "Continuar" }).click();
   }
   for (let index = 0; index < 3 && (await observationField.count()) === 0; index += 1) {
     await page.getByRole("button", { name: "Próximo" }).click();
@@ -50,7 +50,7 @@ test("critical local-first flow", async ({ browser }) => {
   await page.close();
   const reopenedPage = await context.newPage();
   await reopenedPage.goto("/");
-  await reopenedPage.getByRole("button", { name: "Continuar coleta" }).click();
+  await reopenedPage.getByRole("button", { name: "Continuar" }).click();
   await reopenedPage.getByRole("button", { name: "Próximo" }).click();
   await reopenedPage.getByRole("button", { name: "Próximo" }).click();
   await expect(reopenedPage.getByLabel("Observação geral do período")).toHaveValue("Observação demonstrativa.");
@@ -61,11 +61,11 @@ test("critical local-first flow", async ({ browser }) => {
   await reopenedPage.getByLabel("Selecionar todos").check();
   await reopenedPage.getByRole("button", { name: "Sincronizar selecionados" }).click();
 
-  await expect(reopenedPage.getByText("Coleta recebida pelo servidor")).toBeVisible();
+  await expect(reopenedPage.getByRole("cell", { name: "Coleta recebida pelo servidor" })).toBeVisible();
   await expect(reopenedPage.getByText("Nenhuma coleta fechada aguardando envio.")).toBeVisible();
 
   await reopenedPage.getByRole("link", { name: "Registros", exact: true }).click();
-  await expect(reopenedPage.getByText("Recebida")).toBeVisible();
+  await expect(reopenedPage.locator("text=Recebida").first()).toBeVisible();
   await reopenedPage.getByRole("button", { name: "Ver" }).first().click();
   await expect(reopenedPage.getByText("Observação demonstrativa.")).toBeVisible();
   await expect(reopenedPage.getByText("Doações voluntárias/espontâneas")).toBeVisible();

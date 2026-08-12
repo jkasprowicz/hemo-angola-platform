@@ -18,9 +18,11 @@ export const syncRemoteRepository = {
         institution_id: record.institutionId,
         unit_id: record.unitId,
         reporting_period_id: record.reportingPeriodId,
+        collection_date: record.collectionDate,
         payload: {
           cycle: {
             cycleUuid: record.cycleUuid,
+            collectionDate: record.collectionDate,
             responsibleUsername: record.responsibleUsername,
             generalObservation: record.generalObservation,
             versionNumber: record.versionNumber,
@@ -29,6 +31,8 @@ export const syncRemoteRepository = {
             collectionStatus: record.collectionStatus,
             syncStatus: record.syncStatus,
             closedAt: record.closedAt,
+            submittedAt: record.submittedAt,
+            receivedAt: record.receivedAt,
           },
           responses: record.responses,
         },
@@ -46,6 +50,7 @@ export const syncRemoteRepository = {
           occurred_at: event.occurredAt,
         })),
         closed_at: record.closedAt,
+        submitted_at: record.submittedAt,
       })),
       }, { signal: controller.signal });
     } finally {

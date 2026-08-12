@@ -14,6 +14,16 @@ const dashboardServiceMock = vi.hoisted(() => ({
   getDashboard: vi.fn(),
 }));
 
+const useMediaQueryMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@mantine/hooks", async () => {
+  const actual = await vi.importActual<typeof import("@mantine/hooks")>("@mantine/hooks");
+  return {
+    ...actual,
+    useMediaQuery: useMediaQueryMock,
+  };
+});
+
 vi.mock("../../../hooks/useSession", () => ({
   useSession: () => ({
     data: { authenticated: true },
@@ -233,6 +243,7 @@ function renderDashboard() {
 describe("DashboardPage", () => {
   beforeEach(() => {
     dashboardServiceMock.getDashboard.mockResolvedValue(dashboardPayload);
+    useMediaQueryMock.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -244,18 +255,22 @@ describe("DashboardPage", () => {
     renderDashboard();
 
     expect(screen.getByText("Carregando dados consolidados…")).toBeTruthy();
-    expect(await screen.findByText("Coletas recebidas")).toBeTruthy();
-    expect(screen.getByText("2")).toBeTruthy();
+    const contextBar = await screen.findByTestId("dashboard-context-bar");
+    expect(contextBar).toBeTruthy();
+    expect(within(contextBar).getByText("Coletas")).toBeTruthy();
+    expect(within(contextBar).getByText("2")).toBeTruthy();
     expect(screen.getAllByText("Percentual de doações voluntárias").length).toBeGreaterThan(0);
-    expect(screen.getByText("42,86%")).toBeTruthy();
+    expect(screen.getByText("42,9%")).toBeTruthy();
     expect(screen.getAllByText("Sem referência definida").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("dashboard-view-overview")).toBeTruthy();
+    expect(screen.getByText("Volume analisado")).toBeTruthy();
   });
 
   it("renders error state and allows retry", async () => {
     dashboardServiceMock.getDashboard.mockRejectedValueOnce(new Error("Falha"));
     renderDashboard();
 
-    expect(await screen.findByText("Não foi possível carregar o dashboard.")).toBeTruthy();
+    expect(await screen.findByTestId("dashboard-error-state")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     await waitFor(() => {
       expect(dashboardServiceMock.getDashboard).toHaveBeenCalledTimes(2);
@@ -272,28 +287,60 @@ describe("DashboardPage", () => {
     });
     renderDashboard();
 
-    expect(await screen.findByText("Nenhum dado sincronizado para o intervalo selecionado")).toBeTruthy();
+    expect(await screen.findByTestId("dashboard-empty-state")).toBeTruthy();
   });
 
   it("updates filters and requests a new payload", async () => {
     renderDashboard();
 
-    await screen.findByText("Coletas recebidas");
-    fireEvent.click(screen.getAllByLabelText("Período inicial")[0]);
-    fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Fevereiro/2026" }));
+    await screen.findByTestId("dashboard-context-bar");
+    fireEvent.click(screen.getByTestId("dashboard-filter-period-from"));
+    fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "Agosto/2026" }));
 
     await waitFor(() => {
-      expect(dashboardServiceMock.getDashboard).toHaveBeenLastCalledWith(
-        expect.objectContaining({ periodFrom: 2 }),
-      );
+      expect(dashboardServiceMock.getDashboard).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+
+    await waitFor(() => {
+        expect(dashboardServiceMock.getDashboard).toHaveBeenLastCalledWith(
+          expect.objectContaining({ periodFrom: 8 }),
+        );
     });
   });
 
   it("navigates to filtered records when clicking a period link", async () => {
     renderDashboard();
 
-    await screen.findByText("Tabela de consolidação por período");
-    fireEvent.click(screen.getByRole("button", { name: "Janeiro/2026" }));
+    await screen.findByTestId("dashboard-view-switcher");
+    fireEvent.click(screen.getByRole("radio", { name: "Consolidados" }));
+    await screen.findByText("Dados consolidados");
+    fireEvent.click(screen.getByTestId("dashboard-open-period-1"));
     expect(await screen.findByText("Registros filtrados")).toBeTruthy();
+  });
+
+  it("switches between overview, trends and consolidated views", async () => {
+    renderDashboard();
+
+    expect(await screen.findByTestId("dashboard-view-overview")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "Tendências" }));
+    expect(await screen.findByTestId("dashboard-view-trends")).toBeTruthy();
+    expect(screen.queryByTestId("dashboard-view-overview")).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Consolidados" }));
+    expect(await screen.findByTestId("dashboard-view-consolidated")).toBeTruthy();
+    expect(screen.getByText("Dados consolidados")).toBeTruthy();
+  });
+
+  it("renders compact mobile filters with apply action below the fields", async () => {
+    useMediaQueryMock.mockReturnValue(true);
+    renderDashboard();
+
+    await screen.findByTestId("dashboard-context-bar");
+    expect(screen.getByText("Painel hemoterápico")).toBeTruthy();
+    const mobileActions = screen.getByTestId("dashboard-filter-actions-mobile");
+    expect(mobileActions).toBeTruthy();
+    expect(within(mobileActions).getByRole("button", { name: "Aplicar filtros" })).toBeTruthy();
   });
 });
