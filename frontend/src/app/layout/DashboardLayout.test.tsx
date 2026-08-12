@@ -58,6 +58,7 @@ describe("DashboardLayout", () => {
     renderDashboardLayout();
 
     expect(screen.getByText("Dashboard de Indicadores Hemoterápicos")).toBeTruthy();
+    expect(screen.getByText("HEMO-DATA")).toBeTruthy();
     expect(screen.getByText("Conteúdo do dashboard")).toBeTruthy();
     expect(screen.queryByText("Coleta")).toBeNull();
     expect(screen.queryByText("Sincronização")).toBeNull();

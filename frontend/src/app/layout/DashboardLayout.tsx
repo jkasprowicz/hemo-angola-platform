@@ -4,6 +4,7 @@ import { useMediaQuery } from "@mantine/hooks";
 import { IconArrowLeft } from "@tabler/icons-react";
 import { Outlet, useNavigate } from "react-router-dom";
 
+import { HemoDataBrand } from "../../components/brand/HemoDataBrand";
 import { useLogoutAction } from "../../hooks/useLogoutAction";
 import type { BootstrapPayload } from "../../types/submission";
 
@@ -31,8 +32,8 @@ export function DashboardLayout({ bootstrap: _bootstrap }: { bootstrap: Bootstra
     <AppShell header={{ height: isMobileLayout ? 120 : 88 }} padding={{ base: "md", lg: "lg" }}>
       <AppShell.Header px="md" py="sm">
         <Group justify="space-between" align="flex-start" wrap="wrap">
-          <Stack gap={2}>
-            <Text fw={700}>HEMO-ANGOLA</Text>
+          <Stack gap={4}>
+            <HemoDataBrand variant="compact" />
             <Text component="h1" size="lg" fw={600}>
               Dashboard de Indicadores Hemoterápicos
             </Text>

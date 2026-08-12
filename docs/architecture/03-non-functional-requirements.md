@@ -1,0 +1,30 @@
+# Non-Functional Requirements
+
+Status date: 2026-08-12
+
+| ID | Category | Requirement | Status | Source | Evidence / note |
+| --- | --- | --- | --- | --- | --- |
+| NFR-SEC-001 | SECURITY | The platform must use authenticated server sessions with CSRF protection for state-changing operations. | IMPLEMENTED | PDF v1.0; `backend/apps/core/views.py`; tests | Login/logout and sync flows use Django session auth and CSRF checks. |
+| NFR-SEC-002 | SECURITY | Production behavior must support secure cookies, SSL redirect, trusted origins and HSTS via environment configuration. | IMPLEMENTED | `.env.example`; `backend/hemo_angola/settings.py` | Secure knobs are configurable and production fails fast on missing critical settings. |
+| NFR-SEC-003 | SECURITY | Browser storage should avoid persistent bearer tokens. | IMPLEMENTED | ADR baseline; frontend auth design | The frontend relies on server session cookies, not locally stored API tokens. |
+| NFR-CONN-001 | CONNECTIVITY | The product must remain operable during loss of internet connectivity through local persistence and later sync. | IMPLEMENTED | PDF v1.0; IndexedDB; E2E tests | Offline create/edit/close flow works and sync occurs later. |
+| NFR-CONN-002 | CONNECTIVITY | The product should support prolonged operation without external connectivity across multiple users or devices. | PROPOSED | User request; offline architecture analysis | Current repo supports per-device offline only, not multi-user offline coordination. |
+| NFR-PERF-001 | PERFORMANCE | Sync requests should fail fast enough to avoid long UI hangs when the network is unavailable. | IMPLEMENTED | `syncRemoteRepository.ts` | Client uses a 15-second abort controller timeout. |
+| NFR-PERF-002 | PERFORMANCE | Dashboard calculations must aggregate from latest versions with bounded query size suitable for MVP usage. | IMPLEMENTED PARTIALLY | `dashboard/services.py`; `ServerRecordsView` | Query logic is bounded and simple, but there is no explicit benchmark or pagination strategy for scale. |
+| NFR-REL-001 | RELIABILITY | Sync failures must keep data queued for later retry instead of losing payloads. | IMPLEMENTED | `markSyncError`; `getEligibleQueueItems` | Failed items remain in IndexedDB with retry metadata. |
+| NFR-REL-002 | RELIABILITY | Interrupted syncs must be recoverable after page reload or browser restart. | IMPLEMENTED | `recoverInterruptedSyncs`; `hydrateSyncMeta` | Orphaned syncing items are converted back to error/retry state. |
+| NFR-REL-003 | RELIABILITY | Central receipt must be idempotent to avoid duplicate submissions on re-send. | IMPLEMENTED | `SyncBatchView`; backend tests | Replay does not create duplicate server rows. |
+| NFR-REC-001 | RECOVERY | Local collection state must survive page reload and browser reopen on the same device. | IMPLEMENTED | IndexedDB; E2E tests | Records and observations persist through reload and reopened page. |
+| NFR-REC-002 | RECOVERY | The platform should support controlled database restore procedures before pilot go-live. | IMPLEMENTED PARTIALLY | `docs/deployment/BACKUP-AND-RESTORE.md` | Manual backup/restore runbook exists, but no automated validation is encoded in app runtime. |
+| NFR-AUD-001 | AUDITABILITY | Auth, sync and dashboard access must emit auditable server events. | IMPLEMENTED | `audit_service`; dashboard view | Audit events are stored with actor, source, entity and correlation metadata. |
+| NFR-AUD-002 | AUDITABILITY | Local record history must preserve field-level and lifecycle events with before/after payloads. | IMPLEMENTED | `RecordEvent`; local repository | Local audit events are appended on create, save, close, reopen and sync transitions. |
+| NFR-USAB-001 | USABILITY | Protected routes must redirect unauthenticated users to login. | IMPLEMENTED | Router; Playwright tests | Logout immediately blocks protected routes. |
+| NFR-USAB-002 | USABILITY | Sync errors should present user-friendly connectivity-aware messages. | IMPLEMENTED | `syncEngine.ts` | Network failures are mapped to clear retry guidance. |
+| NFR-RESP-001 | RESPONSIVENESS | The frontend should support mobile-oriented collection and dashboard layouts. | IMPLEMENTED PARTIALLY | responsive UI code; existing mobile quality report | Mantine layouts adapt to viewport, but formal responsive acceptance coverage remains limited. |
+| NFR-MAIN-001 | MAINTAINABILITY | The platform must keep backend domains separated into apps and frontend domains separated by feature/service/repository boundaries. | IMPLEMENTED | repository structure | Codebase is modularized across backend apps and frontend domain layers. |
+| NFR-MAIN-002 | MAINTAINABILITY | Business catalog data should be managed as backend metadata rather than hardcoded UI-only forms. | IMPLEMENTED | bootstrap and demo data services | Frontend consumes modules, variables and indicators from backend bootstrap. |
+| NFR-DEP-001 | DEPLOYMENT | The repository must support separate development and production deployment baselines. | IMPLEMENTED | `docker-compose.yml`; `docker-compose.prod.yml`; deploy docs | Distinct development and production-oriented stacks exist. |
+| NFR-DEP-002 | DEPLOYMENT | Production runtime should place PostgreSQL behind the application layer and not expose it directly to clients. | IMPLEMENTED | `docker-compose.prod.yml`; Nginx baseline | Browser traffic reaches Nginx/API only; database stays internal. |
+| NFR-BKP-001 | BACKUP | Backup and restore procedures must be defined before pilot go-live. | IMPLEMENTED PARTIALLY | PDF v1.0; deployment docs | Runbooks exist, but pilot operations and restore drills are still pending. |
+| NFR-OBS-001 | OBSERVABILITY | The platform must expose a simple health endpoint for service checks. | IMPLEMENTED | `HealthView`; compose health checks | `GET /api/health/` supports backend and container health checks. |
+| NFR-OBS-002 | OBSERVABILITY | The platform should produce structured operational logging for pilot operations. | TO-BE | PDF v1.0; settings logging baseline | Logging exists but not as a full structured observability stack. |

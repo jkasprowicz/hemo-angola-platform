@@ -13,6 +13,7 @@ test("unauthenticated user cannot access /dashboard", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: "Entrar" })).toBeVisible();
+  await expect(page).toHaveTitle("HEMO-DATA | Indicadores Hemoterápicos");
 });
 
 test("dashboard uses synced backend data and supports period drill-down", async ({ page }) => {
@@ -20,6 +21,7 @@ test("dashboard uses synced backend data and supports period drill-down", async 
 
   await page.goto("/dashboard");
   await expect(page.getByRole("heading", { name: "Dashboard de Indicadores Hemoterápicos" })).toBeVisible();
+  await expect(page.getByText("HEMO-DATA")).toBeVisible();
   await expect(page.getByRole("button", { name: "Voltar ao sistema" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sair" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Coleta", exact: true })).toHaveCount(0);
@@ -108,6 +110,69 @@ test("dashboard header controls remain accessible across responsive viewports", 
   }
 });
 
+test("mobile pages load with correct viewport metadata and no horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/login");
+
+  const viewportMeta = await page.locator('meta[name="viewport"]').getAttribute("content");
+  expect(viewportMeta).toBe("width=device-width, initial-scale=1.0");
+  await expect(page).toHaveTitle("HEMO-DATA | Indicadores Hemoterápicos");
+  await expect(page.getByText("HEMO-DATA")).toBeVisible();
+  await expect(page.getByText("Plataforma de Indicadores Hemoterápicos")).toBeVisible();
+  await expect(page.getByText("Ambiente demonstrativo")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  await login(page);
+  await page.goto("/inicio");
+  await expectNoHorizontalOverflow(page);
+
+  await page.goto("/coleta");
+  await expectNoHorizontalOverflow(page);
+
+  await page.goto("/dashboard");
+  await expectNoHorizontalOverflow(page);
+});
+
+test("application header keeps logout aligned on responsive viewports", async ({ page }) => {
+  await login(page);
+
+  for (const viewport of [
+    { width: 360, height: 800 },
+    { width: 375, height: 812 },
+    { width: 390, height: 844 },
+    { width: 430, height: 932 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/inicio");
+
+    const brand = page.getByText("HEMO-DATA");
+    const logoutButton = page.getByRole("button", { name: "Sair" });
+
+    await expect(brand).toBeVisible();
+    await expect(logoutButton).toBeVisible();
+
+    if (viewport.width < 768) {
+      await expect(page.getByLabel(/menu de navegação/)).toBeVisible();
+    }
+
+    if (viewport.width <= 768) {
+      await expect(page.getByText("Plataforma de Indicadores Hemoterápicos")).toHaveCount(0);
+    } else {
+      await expect(page.getByText("Plataforma de Indicadores Hemoterápicos")).toBeVisible();
+    }
+
+    const [brandBox, logoutBox] = await Promise.all([brand.boundingBox(), logoutButton.boundingBox()]);
+    expect(brandBox).not.toBeNull();
+    expect(logoutBox).not.toBeNull();
+    expect(Math.abs((brandBox?.y ?? 0) - (logoutBox?.y ?? 0))).toBeLessThan(12);
+    expect((logoutBox?.x ?? 0) + (logoutBox?.width ?? 0)).toBeGreaterThan((brandBox?.x ?? 0) + (brandBox?.width ?? 0));
+
+    await expectNoHorizontalOverflow(page);
+  }
+});
+
 
 async function login(page: Page) {
   await page.goto("/login");
@@ -166,4 +231,12 @@ async function selectHomePeriod(page: Page, month: string, year: string) {
   await page.getByRole("option", { name: year }).click();
   await page.getByRole("textbox", { name: "Mês" }).click();
   await page.getByRole("option", { name: month }).click();
+}
+
+async function expectNoHorizontalOverflow(page: Page) {
+  const hasHorizontalOverflow = await page.evaluate(() => {
+    const root = document.documentElement;
+    return root.scrollWidth > root.clientWidth;
+  });
+  expect(hasHorizontalOverflow).toBeFalsy();
 }

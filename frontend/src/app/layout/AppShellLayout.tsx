@@ -1,10 +1,11 @@
 import React from "react";
-import { Alert, AppShell, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
+import { Alert, AppShell, Box, Burger, Button, Group, NavLink, Stack, Text } from "@mantine/core";
+import { useDisclosure, useMediaQuery } from "@mantine/hooks";
 import { IconChartBar, IconCloudUpload, IconClipboardList, IconFileSearch, IconHome2, IconListDetails, IconStethoscope } from "@tabler/icons-react";
 import { useEffect } from "react";
 import { NavLink as RouterNavLink, Outlet, useLocation } from "react-router-dom";
 
+import { HemoDataBrand } from "../../components/brand/HemoDataBrand";
 import { ContextBar } from "../../features/context/components/ContextBar";
 import { OfflineBanner } from "../../components/shared/OfflineBanner";
 import { useConnectivity } from "../../hooks/useConnectivity";
@@ -15,6 +16,7 @@ import type { BootstrapPayload } from "../../types/submission";
 
 export function AppShellLayout({ bootstrap }: { bootstrap: BootstrapPayload }) {
   const [opened, { toggle, close }] = useDisclosure();
+  const isCompactHeader = useMediaQuery("(max-width: 48em)") ?? false;
   const location = useLocation();
   const connectivity = useConnectivity();
   const pendingCount = useSyncStore((state) => state.pendingCount);
@@ -45,7 +47,7 @@ export function AppShellLayout({ bootstrap }: { bootstrap: BootstrapPayload }) {
 
   return (
     <AppShell
-      header={{ height: 72 }}
+      header={{ height: isCompactHeader ? 64 : 72 }}
       navbar={{
         width: 280,
         breakpoint: "md",
@@ -53,9 +55,14 @@ export function AppShellLayout({ bootstrap }: { bootstrap: BootstrapPayload }) {
       }}
       padding="md"
     >
-      <AppShell.Header p="md">
-        <Group justify="space-between">
-          <Group>
+      <AppShell.Header px="md" py={isCompactHeader ? "xs" : "md"}>
+        <Group justify="space-between" align="center" wrap="nowrap" style={{ minHeight: "100%" }}>
+          <Group
+            gap={isCompactHeader ? "xs" : "sm"}
+            wrap="nowrap"
+            align="center"
+            style={{ flex: "1 1 auto", minWidth: 0 }}
+          >
             <Burger
               opened={opened}
               onClick={toggle}
@@ -63,18 +70,17 @@ export function AppShellLayout({ bootstrap }: { bootstrap: BootstrapPayload }) {
               size="sm"
               aria-label={opened ? "Fechar menu de navegação" : "Abrir menu de navegação"}
             />
-            <div>
-              <Text fw={700}>HEMO-ANGOLA</Text>
-              <Text size="sm" c="dimmed">
-                Fluxo operacional crítico
-              </Text>
-            </div>
+            <Box style={{ minWidth: 0 }}>
+              <HemoDataBrand variant="compact" showSubtitle={!isCompactHeader} />
+            </Box>
           </Group>
           <Button
             variant="subtle"
+            size="sm"
             onClick={() => logoutMutation.mutate()}
             loading={logoutMutation.isPending}
             disabled={logoutMutation.isPending}
+            style={{ flexShrink: 0 }}
           >
             Sair
           </Button>

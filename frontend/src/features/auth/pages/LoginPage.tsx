@@ -1,9 +1,11 @@
-import { Alert, Button, Container, Paper, PasswordInput, Stack, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Badge, Box, Button, Container, Paper, PasswordInput, Stack, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
+import { useMediaQuery } from "@mantine/hooks";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
+import { HemoDataBrand } from "../../../components/brand/HemoDataBrand";
 import { authService } from "../../../services/authService";
 
 const demoUsername = import.meta.env.VITE_DEMO_USERNAME ?? "operador";
@@ -11,6 +13,7 @@ const demoCredentialsHint = import.meta.env.VITE_DEMO_CREDENTIALS_HINT ?? "";
 
 
 export function LoginPage() {
+  const isMobileLayout = useMediaQuery("(max-width: 48em)");
   const form = useForm({
     initialValues: { username: demoUsername, password: "" },
     validate: {
@@ -49,39 +52,69 @@ export function LoginPage() {
   });
 
   return (
-    <Container size={420} py="xl">
-      <Paper withBorder radius="md" p="xl">
-        <Stack gap="md">
-          <div>
-            <Text size="xs" tt="uppercase" c="blue" fw={700}>
-              HEMO-ANGOLA
-            </Text>
-            <Title order={1}>Entrar</Title>
-            <Text c="dimmed" size="sm">
-              Use a conta demonstrativa para validar o fluxo operacional crítico.
-            </Text>
-          </div>
-
-          {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
-
-          <form
-            onSubmit={form.onSubmit((values) => {
-              setErrorMessage(null);
-              loginMutation.mutate(values);
-            })}
-          >
-            <Stack gap="sm">
-              <TextInput label="Usuário" placeholder={demoUsername} {...form.getInputProps("username")} />
-              <PasswordInput label="Senha" placeholder="Sua senha" {...form.getInputProps("password")} />
-              <Button type="submit" loading={loginMutation.isPending}>
+    <Box mih="100vh" py={{ base: "xl", md: 80 }} px="md">
+      <Container size={520}>
+        <Paper
+          withBorder
+          radius="xl"
+          p={{ base: "lg", sm: "xl" }}
+          shadow="sm"
+          style={{
+            marginInline: "auto",
+            width: "100%",
+            maxWidth: 520,
+            background:
+              "linear-gradient(180deg, rgba(244,251,252,0.98) 0%, rgba(255,255,255,0.99) 22%, rgba(255,255,255,1) 100%)",
+            borderColor: "#d9edf2",
+          }}
+        >
+          <Stack gap="lg">
+            <Stack gap="sm" align={isMobileLayout ? "stretch" : "center"}>
+              <HemoDataBrand variant="default" />
+              <Text component="h1" fw={700} size="xl" ta={isMobileLayout ? "left" : "center"}>
                 Entrar
-              </Button>
+              </Text>
+              <Text c="dimmed" size="sm" ta={isMobileLayout ? "left" : "center"}>
+                Use suas credenciais para acessar a plataforma.
+              </Text>
+              <Badge variant="light" color="gray" radius="sm" w="fit-content">
+                Ambiente demonstrativo
+              </Badge>
             </Stack>
-          </form>
 
-          {demoCredentialsHint ? <Alert color="gray" variant="light">{demoCredentialsHint}</Alert> : null}
-        </Stack>
-      </Paper>
-    </Container>
+            {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
+
+            <form
+              onSubmit={form.onSubmit((values) => {
+                setErrorMessage(null);
+                loginMutation.mutate(values);
+              })}
+            >
+              <Stack gap="sm">
+                <TextInput
+                  label="Usuário"
+                  placeholder={demoUsername}
+                  size="md"
+                  radius="md"
+                  {...form.getInputProps("username")}
+                />
+                <PasswordInput
+                  label="Senha"
+                  placeholder="Sua senha"
+                  size="md"
+                  radius="md"
+                  {...form.getInputProps("password")}
+                />
+                <Button type="submit" size="md" radius="md" loading={loginMutation.isPending} fullWidth>
+                  Entrar
+                </Button>
+              </Stack>
+            </form>
+
+            {demoCredentialsHint ? <Alert color="gray" variant="light">{demoCredentialsHint}</Alert> : null}
+          </Stack>
+        </Paper>
+      </Container>
+    </Box>
   );
 }

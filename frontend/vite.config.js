@@ -10,24 +10,37 @@ export default defineConfig({
             devOptions: {
                 enabled: true,
             },
+            includeAssets: ["favicon.svg", "favicon-32x32.png", "apple-touch-icon.png"],
             manifest: {
-                name: "HEMO-ANGOLA Prototype",
-                short_name: "HEMO-ANGOLA",
-                description: "Protótipo pré-submissão offline-first da plataforma HEMO-ANGOLA.",
-                theme_color: "#0f3d56",
-                background_color: "#f4f7f9",
+                name: "HEMO-DATA — Plataforma de Indicadores Hemoterápicos",
+                short_name: "HEMO-DATA",
+                description: "Plataforma de indicadores hemoterápicos do projeto HEMO-ANGOLA.",
+                theme_color: "#0b7285",
+                background_color: "#f4fbfc",
                 display: "standalone",
                 start_url: "/",
                 icons: [
                     {
-                        src: "/pwa-192.png",
+                        src: "/pwa-192x192.png",
                         sizes: "192x192",
                         type: "image/png"
                     },
                     {
-                        src: "/pwa-512.png",
+                        src: "/pwa-512x512.png",
                         sizes: "512x512",
                         type: "image/png"
+                    },
+                    {
+                        src: "/pwa-maskable-192x192.png",
+                        sizes: "192x192",
+                        type: "image/png",
+                        purpose: "maskable"
+                    },
+                    {
+                        src: "/pwa-maskable-512x512.png",
+                        sizes: "512x512",
+                        type: "image/png",
+                        purpose: "maskable"
                     }
                 ]
             }

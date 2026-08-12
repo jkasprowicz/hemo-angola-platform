@@ -76,7 +76,7 @@ export function DashboardPage() {
   const session = useSession();
   const bootstrap = useBootstrap(session.data?.authenticated === true);
   const navigate = useNavigate();
-  const isMobileLayout = useMediaQuery("(max-width: 62em)");
+  const isMobileLayout = useMediaQuery("(max-width: 62em)") ?? false;
   const [draftFilters, setDraftFilters] = useState<FilterState>({
     unitId: null,
     periodFrom: null,
@@ -271,6 +271,7 @@ export function DashboardPage() {
                     {selectedSeries ? (
                       <DashboardSeriesChart
                         series={selectedSeries}
+                        isMobileLayout={isMobileLayout}
                         onPointClick={(periodId) => navigate(`/registros?period=${periodId}&source=dashboard`)}
                       />
                     ) : null}
@@ -742,9 +743,11 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function DashboardSeriesChart({
   series,
+  isMobileLayout,
   onPointClick,
 }: {
   series: DashboardSeriesPayload;
+  isMobileLayout: boolean;
   onPointClick: (periodId: number) => void;
 }) {
   const values = series.points.map((point) => point.value).filter((value): value is number => value !== null);
@@ -832,7 +835,7 @@ function DashboardSeriesChart({
           viewBox={`0 0 ${width} ${height}`}
           role="img"
           aria-label={`Série temporal de ${series.indicator_name}`}
-          style={{ width: "100%", minWidth: 640, height: "auto" }}
+          style={{ width: "100%", minWidth: isMobileLayout ? 0 : 640, height: "auto" }}
         >
           {gridValues.map((gridValue) => {
             const y =

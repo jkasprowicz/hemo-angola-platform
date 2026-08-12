@@ -1,0 +1,27 @@
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #f4fbfc 0%, #f8fafc 22%, #ffffff 100%);
+}
+
+img,
+svg,
+canvas {
+  max-width: 100%;
+}
+
+@media (max-width: 48em) {
+  input,
+  select,
+  textarea,
+  .mantine-Input-input,
+  .mantine-Select-input {
+    font-size: 16px;
+  }
+}

@@ -1,5 +1,6 @@
 import React from "react";
 import { MantineProvider } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,6 +24,14 @@ vi.mock("../../services/authService", () => ({
   },
 }));
 
+vi.mock("@mantine/hooks", async () => {
+  const actual = await vi.importActual<typeof import("@mantine/hooks")>("@mantine/hooks");
+  return {
+    ...actual,
+    useMediaQuery: vi.fn(),
+  };
+});
+
 
 describe("AppShellLayout", () => {
   const queryClient = new QueryClient();
@@ -30,6 +39,7 @@ describe("AppShellLayout", () => {
   afterEach(() => {
     cleanup();
     queryClient.clear();
+    vi.clearAllMocks();
   });
 
   beforeEach(() => {
@@ -89,5 +99,39 @@ describe("AppShellLayout", () => {
     fireEvent.click(screen.getByLabelText("Abrir menu de navegação"));
     fireEvent.click(screen.getByText("Início"));
     expect(screen.getByLabelText("Abrir menu de navegação")).toBeTruthy();
+  });
+
+  it("renders the HEMO-DATA brand in the application header", () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MantineProvider>
+          <MemoryRouter>
+            <AppShellLayout bootstrap={demoBootstrap} />
+          </MemoryRouter>
+        </MantineProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("HEMO-DATA")).toBeTruthy();
+    expect(screen.getByText("Plataforma de Indicadores Hemoterápicos")).toBeTruthy();
+  });
+
+  it("keeps logout on the same mobile header line and hides the subtitle", () => {
+    vi.mocked(useMediaQuery).mockReturnValue(true);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MantineProvider>
+          <MemoryRouter>
+            <AppShellLayout bootstrap={demoBootstrap} />
+          </MemoryRouter>
+        </MantineProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByLabelText("Abrir menu de navegação")).toBeTruthy();
+    expect(screen.getByText("HEMO-DATA")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sair" })).toBeTruthy();
+    expect(screen.queryByText("Plataforma de Indicadores Hemoterápicos")).toBeNull();
   });
 });

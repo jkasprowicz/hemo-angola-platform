@@ -11,6 +11,8 @@ test("critical local-first flow", async ({ browser }) => {
   const page = await context.newPage();
 
   await page.goto("/login");
+  await expect(page).toHaveTitle("HEMO-DATA | Indicadores Hemoterápicos");
+  await expect(page.getByText("HEMO-DATA")).toBeVisible();
   await page.getByLabel("Usuário").fill("operador");
   await page.getByLabel("Senha").fill(demoPassword);
   await page.getByRole("button", { name: "Entrar" }).click();
